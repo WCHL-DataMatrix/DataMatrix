@@ -1,7 +1,16 @@
+mod nft;
+mod nft_impl;
+mod upload;
+mod validation;
+
 use ic_cdk::export_candid;
 use std::cell::RefCell;
 
 use ic_llm::{ChatMessage, Model};
+
+use dip721_rs::TokenMetadata;
+use ic_cdk_macros::{init, query};
+use serde_cbor::Value;
 
 #[ic_cdk::update]
 async fn prompt(prompt_str: String) -> String {
