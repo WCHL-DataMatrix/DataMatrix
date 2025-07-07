@@ -1,21 +1,17 @@
-type AssistantMessage = record {
-  content : opt text;
-  tool_calls : vec ToolCall;
+type MintRequest = record {
+  cid : text;
+  owner : opt principal;
+  metadata : vec blob;
 };
-type ChatMessage = variant {
-  tool : record { content : text; tool_call_id : text };
-  user : record { content : text };
-  assistant : AssistantMessage;
-  system : record { content : text };
-};
-type FunctionCall = record { name : text; arguments : vec ToolCallArgument };
-type ToolCall = record { id : text; function : FunctionCall };
-type ToolCallArgument = record { value : text; name : text };
+type MintResponse = record { token_id : nat64 };
+type Result = variant { Ok : MintResponse; Err : text };
+type Result_1 = variant { Ok : UploadResponse; Err : text };
+type TokenInfo = record { cid : text; owner : principal; metadata : vec blob };
+type UploadRequest = record { content : blob; mime_type : text };
+type UploadResponse = record { data : vec blob };
 service : {
-  chat : (vec ChatMessage) -> (text);
-  get_count : () -> (nat64) query;
-  greet : (text) -> (text) query;
-  increment : () -> (nat64);
-  prompt : (text) -> (text);
-  set_count : (nat64) -> (nat64);
+  get_token_info : (nat64) -> (opt TokenInfo) query;
+  list_tokens : () -> (vec nat64) query;
+  mint_nft : (MintRequest) -> (Result);
+  upload : (UploadRequest) -> (Result_1);
 }
