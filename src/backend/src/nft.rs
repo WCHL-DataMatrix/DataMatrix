@@ -8,11 +8,11 @@ use std::collections::{HashMap, VecDeque};
 
 thread_local! {
     /// 전역 토큰 카운터
-    static TOKEN_COUNT: RefCell<u64> = RefCell::new(0);
+    static TOKEN_COUNT: RefCell<u64> = const { RefCell::new(0) };
     /// token_id → TokenInfo 매핑
     static TOKENS: RefCell<HashMap<u64, TokenInfo>> = RefCell::new(HashMap::new());
     /// 민팅 요청 큐: (request_id, MintRequest)
-    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = RefCell::new(VecDeque::new());
+    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = const { RefCell::new(VecDeque::new()) };
     /// request_id → MintStatus 매핑
     static MINT_STATUS: RefCell<HashMap<u64, MintStatus>> = RefCell::new(HashMap::new());
 }
