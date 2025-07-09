@@ -1,4 +1,4 @@
-use csv::Reader;
+use csv::ReaderBuilder;
 use serde_cbor::value::{to_value, Value as CborValue};
 use serde_json::Value as JsonValue;
 use std::str;
@@ -19,7 +19,9 @@ pub fn upload_data(content: Vec<u8>, mime_type: &str) -> Result<Vec<CborValue>, 
         }
         "text/csv" => {
             // CSV 파싱: 각 레코드를 Text 배열로 변환
-            let mut rdr = Reader::from_reader(content.as_slice());
+            let mut rdr = ReaderBuilder::new()
+                .has_headers(false)
+                .from_reader(content.as_slice());
             let mut out = Vec::new();
             for result in rdr.records() {
                 let record = result.map_err(|e| format!("CSV 레코드 오류: {}", e))?;
@@ -37,5 +39,29 @@ pub fn upload_data(content: Vec<u8>, mime_type: &str) -> Result<Vec<CborValue>, 
         }
         // 기타 바이너리 포맷(EX: 이미지)은 우선 그대로 Blob으로 저장하거나 IPFS 등에 올림
         _ => Err(format!("지원하지 않는 MIME 타입: {}", mime_type)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::validation::validate_data;
+
+    #[test]
+    fn test_json_upload_and_validate() {
+        let raw = br#"[{"foo":"bar"},{"foo":"baz"}]"#.to_vec();
+        let parsed = upload_data(raw, "application/json").unwrap();
+        // 두 개의 CBOR blob 이 들어와야 함
+        assert_eq!(parsed.len(), 2);
+        // validate_data 에러 없어야 함
+        validate_data(&parsed).unwrap();
+    }
+
+    #[test]
+    fn test_csv_upload_and_validate() {
+        let raw = b"a,b\nx,y\n".to_vec();
+        let parsed = upload_data(raw, "text/csv").unwrap();
+        assert_eq!(parsed.len(), 2);
+        validate_data(&parsed).unwrap();
     }
 }

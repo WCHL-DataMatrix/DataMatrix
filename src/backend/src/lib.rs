@@ -1,7 +1,9 @@
 // backend/src/lib.rs
 
 // 매크로 및 타입 임포트
+use candid::Principal;
 use candid::{CandidType, Deserialize};
+use ic_cdk::api::call::call;
 use ic_cdk_macros::{init, query, update};
 use std::time::Duration;
 
@@ -13,6 +15,11 @@ mod validation;
 // #derive: 해당 구조체는 RUST <-> Candid 간 형식 변환을 지원한다
 // #update: 수정을 하겠다
 // #query: 조회만 하겠다
+
+use once_cell::sync::Lazy;
+static WORKER_CANISTER_TEXT: &str = "uqqxf-5h777-77774-qaaaa-cai";
+static WORKER_CANISTER: Lazy<Principal> =
+    Lazy::new(|| Principal::from_text(WORKER_CANISTER_TEXT).expect("잘못된 워커 canister ID"));
 
 // =====================
 // 1) Upload 인터페이스
@@ -68,22 +75,24 @@ pub fn get_mint_status(request_id: u64) -> Option<MintStatus> {
     nft::get_mint_status_internal(request_id)
 }
 
-/// 직접 민팅 (로컬 테스트용)
-#[update]
-pub fn mint_nft(req: MintRequest) -> Result<MintResponse, String> {
-    nft::mint_nft_internal(req)
-}
-
 /// 특정 토큰 정보 조회
 #[query]
-pub fn get_token_info(token_id: u64) -> Option<TokenInfo> {
-    nft::get_token_info_internal(token_id)
+pub async fn get_token_info(token_id: u64) -> Option<nft::TokenInfo> {
+    // worker.get_token_info(query) 호출
+    let (info,): (Option<nft::TokenInfo>,) = call(*WORKER_CANISTER, "get_token_info", (token_id,))
+        .await
+        .unwrap_or_else(|(c, m)| panic!("worker query failed: {:?} {}", c, m));
+    info
 }
 
 /// 전체 민팅된 토큰 ID 리스트 조회
 #[query]
-pub fn list_tokens() -> Vec<u64> {
-    nft::list_tokens_internal()
+pub async fn list_tokens() -> Vec<u64> {
+    // worker.list_tokens(query) 호출
+    let (ids,): (Vec<u64>,) = call(*WORKER_CANISTER, "list_tokens", ())
+        .await
+        .unwrap_or_else(|(c, m)| panic!("worker query failed: {:?} {}", c, m));
+    ids
 }
 
 // =====================
