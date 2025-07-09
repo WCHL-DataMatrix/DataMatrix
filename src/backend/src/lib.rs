@@ -95,7 +95,7 @@ use ic_cdk_timers::set_timer_interval;
 fn init() {
     // 10초마다 process_next_mint를 호출
     set_timer_interval(Duration::from_secs(10), || {
-        nft::process_next_mint();
+        nft::spawn_next_mint();
     });
 }
 

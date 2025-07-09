@@ -1,6 +1,9 @@
 // backend/src/nft.rs
 
 use candid::{CandidType, Deserialize, Principal};
+use ic_cdk::api::call::call_with_payment;
+use ic_cdk::api::call::RejectionCode;
+use ic_cdk::api::id;
 use ic_cdk::caller;
 use ic_cdk_macros::{query, update};
 use std::cell::RefCell;
@@ -35,7 +38,7 @@ pub struct MintRequest {
 }
 
 /// 민팅 응답
-#[derive(CandidType)]
+#[derive(CandidType, Deserialize)]
 pub struct MintResponse {
     pub token_id: u64,
 }
@@ -94,6 +97,39 @@ pub fn process_next_mint() {
                 });
             }
         }
+    }
+}
+
+pub fn spawn_next_mint() {
+    // 1) 큐에서 하나 꺼내기
+    if let Some((request_id, req)) = MINT_QUEUE.with(|q| q.borrow_mut().pop_front()) {
+        // 2) 상태 → InProgress
+        MINT_STATUS.with(|m| m.borrow_mut().insert(request_id, MintStatus::InProgress));
+
+        // 3) 자기 자신에게 “mint_nft” update call (사이클 0) 비동기 요청
+        let me = id();
+        ic_cdk::spawn(async move {
+            let result: Result<(MintResponse,), (RejectionCode, String)> =
+                call_with_payment(me, "mint_nft", (req.clone(),), 0).await;
+
+            // 4) 결과에 따라 상태 업데이트
+            match result {
+                Ok((resp,)) => {
+                    MINT_STATUS.with(|m| {
+                        m.borrow_mut()
+                            .insert(request_id, MintStatus::Completed(resp.token_id))
+                    });
+                }
+                Err((code, msg)) => {
+                    MINT_STATUS.with(|m| {
+                        m.borrow_mut().insert(
+                            request_id,
+                            MintStatus::Failed(format!("code={:?}, msg={}", code, msg)),
+                        )
+                    });
+                }
+            }
+        });
     }
 }
 
