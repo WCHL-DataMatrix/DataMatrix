@@ -4,8 +4,6 @@ use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::call_with_payment;
 use ic_cdk::api::call::RejectionCode;
 use ic_cdk::api::id;
-use ic_cdk::caller;
-use ic_cdk_macros::{query, update};
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -16,7 +14,7 @@ static WORKER_CANISTER: Lazy<Principal> =
 
 thread_local! {
     /// 요청 카운터
-    static REQUEST_COUNT: RefCell<u64> = RefCell::new(0);
+    static REQUEST_COUNT: RefCell<u64> = const { RefCell::new(0) };
     /// 민팅 요청 큐: (request_id, MintRequest)
     static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = const { RefCell::new(VecDeque::new()) };
     /// request_id → MintStatus 매핑

@@ -61,7 +61,7 @@ pub fn upload(req: UploadRequest) -> Result<UploadResponse, String> {
 // 2) 비동기 민팅 인터페이스
 // =====================
 
-use nft::{MintRequest, MintResponse, MintStatus, RequestResponse, TokenInfo};
+use nft::{MintRequest, MintStatus, RequestResponse};
 
 /// 민팅 요청을 큐에 추가
 #[update]
