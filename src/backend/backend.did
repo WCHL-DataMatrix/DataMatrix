@@ -3,15 +3,21 @@ type MintRequest = record {
   owner : opt principal;
   metadata : vec blob;
 };
-type MintResponse = record { token_id : nat64 };
-type Result = variant { Ok : MintResponse; Err : text };
-type Result_1 = variant { Ok : UploadResponse; Err : text };
+type MintStatus = variant {
+  Failed : text;
+  InProgress;
+  Completed : nat64;
+  Pending;
+};
+type RequestResponse = record { request_id : nat64 };
+type Result = variant { Ok : UploadResponse; Err : text };
 type TokenInfo = record { cid : text; owner : principal; metadata : vec blob };
 type UploadRequest = record { content : blob; mime_type : text };
 type UploadResponse = record { data : vec blob };
-service : {
+service : () -> {
+  get_mint_status : (nat64) -> (opt MintStatus) query;
   get_token_info : (nat64) -> (opt TokenInfo) query;
   list_tokens : () -> (vec nat64) query;
-  mint_nft : (MintRequest) -> (Result);
-  upload : (UploadRequest) -> (Result_1);
+  request_mint : (MintRequest) -> (RequestResponse);
+  upload : (UploadRequest) -> (Result);
 }

@@ -3,7 +3,6 @@
 use candid::{CandidType, Deserialize, Principal};
 use ic_cdk::api::call::call_with_payment;
 use ic_cdk::api::call::RejectionCode;
-use ic_cdk::api::id;
 use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
@@ -84,7 +83,6 @@ pub fn spawn_next_mint() {
         MINT_STATUS.with(|m| m.borrow_mut().insert(request_id, MintStatus::InProgress));
 
         // 3) 자기 자신에게 “mint_nft” update call (사이클 0) 비동기 요청
-        let me = id();
         ic_cdk::spawn(async move {
             let result: Result<(MintResponse,), (RejectionCode, String)> =
                 call_with_payment(*WORKER_CANISTER, "mint_nft", (req.clone(),), 0).await;

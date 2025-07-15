@@ -1,0 +1,21 @@
+type MintRequest = record {
+  owner: opt principal;
+  cid: text;
+  metadata: vec blob;
+};
+
+type MintResponse = record {
+  token_id: nat64;
+};
+
+type TokenInfo = record {
+  owner: principal;
+  cid: text;
+  metadata: vec blob;
+};
+
+service : {
+  mint_nft: (MintRequest) -> (variant { Ok: MintResponse; Err: text });
+  get_token_info: (nat64) -> (opt TokenInfo) query;
+  list_tokens: () -> (vec nat64) query;
+}

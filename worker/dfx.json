@@ -1,0 +1,18 @@
+{
+  "canisters": {
+    "worker": {
+      "main": "src/lib.rs",
+      "type": "rust",
+      "candid": "worker.did",
+      "package": "worker"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

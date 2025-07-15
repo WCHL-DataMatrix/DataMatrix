@@ -17,7 +17,7 @@ mod validation;
 // #query: 조회만 하겠다
 
 use once_cell::sync::Lazy;
-static WORKER_CANISTER_TEXT: &str = "uqqxf-5h777-77774-qaaaa-cai";
+static WORKER_CANISTER_TEXT: &str = "bw4dl-smaaa-aaaaa-qaacq-cai";
 static WORKER_CANISTER: Lazy<Principal> =
     Lazy::new(|| Principal::from_text(WORKER_CANISTER_TEXT).expect("잘못된 워커 canister ID"));
 
