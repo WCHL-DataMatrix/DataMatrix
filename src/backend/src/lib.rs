@@ -119,8 +119,8 @@ export_candid!();
 mod tests {
     use super::*;
     use candid::Principal;
-    use ic_cdk::api::time;
-    use std::collections::HashMap;
+    
+    
 
     // 테스트용 더미 데이터
     fn create_test_json_data() -> Vec<u8> {
@@ -387,7 +387,7 @@ mod tests {
 // 통합 테스트 실행을 위한 헬퍼 함수들
 #[cfg(test)]
 mod integration_helpers {
-    use super::*;
+    
 
     /// 테스트용 샘플 데이터 생성기
     pub struct TestDataGenerator;
