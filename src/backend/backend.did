@@ -17,7 +17,9 @@ type UploadResponse = record { data : vec blob };
 service : () -> {
   get_mint_status : (nat64) -> (opt MintStatus) query;
   get_token_info : (nat64) -> (opt TokenInfo) query;
+  get_token_info_from_worker : (nat64) -> (opt TokenInfo);
   list_tokens : () -> (vec nat64) query;
+  list_tokens_from_worker : () -> (vec nat64);
   request_mint : (MintRequest) -> (RequestResponse);
   upload : (UploadRequest) -> (Result);
 }

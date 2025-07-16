@@ -7,15 +7,16 @@ use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
-static WORKER_CANISTER_TEXT: &str = "uqqxf-5h777-77774-qaaaa-cai";
+// 올바른 worker canister ID로 수정
+static WORKER_CANISTER_TEXT: &str = "bw4dl-smaaa-aaaaa-qaacq-cai";
 static WORKER_CANISTER: Lazy<Principal> =
     Lazy::new(|| Principal::from_text(WORKER_CANISTER_TEXT).expect("잘못된 워커 canister ID"));
 
 thread_local! {
     /// 요청 카운터
-    static REQUEST_COUNT: RefCell<u64> = const { RefCell::new(0) };
+    static REQUEST_COUNT: RefCell<u64> = RefCell::new(0);
     /// 민팅 요청 큐: (request_id, MintRequest)
-    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = const { RefCell::new(VecDeque::new()) };
+    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = RefCell::new(VecDeque::new());
     /// request_id → MintStatus 매핑
     static MINT_STATUS: RefCell<HashMap<u64, MintStatus>> = RefCell::new(HashMap::new());
 }
@@ -71,7 +72,7 @@ pub fn request_mint_internal(req: MintRequest) -> RequestResponse {
     });
     // 큐에 삽입
     MINT_QUEUE.with(|q| {
-        q.borrow_mut().push_back((request_id, req.clone()));
+        q.borrow_mut().push_back((request_id, req));
     });
     RequestResponse { request_id }
 }
@@ -80,19 +81,21 @@ pub fn spawn_next_mint() {
     // 1) 큐에서 하나 꺼내기
     if let Some((request_id, req)) = MINT_QUEUE.with(|q| q.borrow_mut().pop_front()) {
         // 2) 상태 → InProgress
-        MINT_STATUS.with(|m| m.borrow_mut().insert(request_id, MintStatus::InProgress));
+        MINT_STATUS.with(|m| {
+            m.borrow_mut().insert(request_id, MintStatus::InProgress);
+        });
 
-        // 3) 자기 자신에게 “mint_nft” update call (사이클 0) 비동기 요청
+        // 3) worker canister에 "mint_nft" update call 비동기 요청
         ic_cdk::spawn(async move {
             let result: Result<(MintResponse,), (RejectionCode, String)> =
-                call_with_payment(*WORKER_CANISTER, "mint_nft", (req.clone(),), 0).await;
+                call_with_payment(*WORKER_CANISTER, "mint_nft", (req,), 0).await;
 
             // 4) 결과에 따라 상태 업데이트
             match result {
                 Ok((resp,)) => {
                     MINT_STATUS.with(|m| {
                         m.borrow_mut()
-                            .insert(request_id, MintStatus::Completed(resp.token_id))
+                            .insert(request_id, MintStatus::Completed(resp.token_id));
                     });
                 }
                 Err((code, msg)) => {
@@ -100,7 +103,7 @@ pub fn spawn_next_mint() {
                         m.borrow_mut().insert(
                             request_id,
                             MintStatus::Failed(format!("code={:?}, msg={}", code, msg)),
-                        )
+                        );
                     });
                 }
             }

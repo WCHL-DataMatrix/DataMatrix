@@ -1,43 +1,80 @@
+// backend/src/upload.rs
+
 use csv::ReaderBuilder;
 use serde_cbor::value::{to_value, Value as CborValue};
 use serde_json::Value as JsonValue;
 use std::str;
 
-// 업로드할 때 Blob(=Vec<u8>)와 mime_type(예: "application/json", "text/csv")를 함께 전달
+/// 업로드 데이터 파싱
 pub fn upload_data(content: Vec<u8>, mime_type: &str) -> Result<Vec<CborValue>, String> {
+    // 빈 데이터 체크
+    if content.is_empty() {
+        return Err("업로드된 데이터가 비어 있습니다".to_string());
+    }
+
     match mime_type {
-        "application/json" => {
-            // JSON 파싱 → CBOR Value 변환
-            let json: JsonValue =
-                serde_json::from_slice(&content).map_err(|e| format!("JSON 파싱 실패: {}", e))?;
-            let cbor = to_value(json).map_err(|e| format!("CBOR 변환 실패: {}", e))?;
-            // 만약 배열이 아닌 단일 값이라면 Vec로 래핑
-            match cbor {
-                CborValue::Array(arr) => Ok(arr),
-                other => Ok(vec![other]),
-            }
-        }
-        "text/csv" => {
-            // CSV 파싱: 각 레코드를 Text 배열로 변환
-            let mut rdr = ReaderBuilder::new()
-                .has_headers(false)
-                .from_reader(content.as_slice());
-            let mut out = Vec::new();
-            for result in rdr.records() {
-                let record = result.map_err(|e| format!("CSV 레코드 오류: {}", e))?;
-                let row = record
-                    .iter()
-                    .map(|s| CborValue::Text(s.to_string()))
-                    .collect::<Vec<_>>();
-                out.push(CborValue::Array(row));
-            }
-            if out.is_empty() {
-                Err("CSV 데이터가 비어 있습니다".into())
-            } else {
-                Ok(out)
-            }
-        }
-        // 기타 바이너리 포맷(EX: 이미지)은 우선 그대로 Blob으로 저장하거나 IPFS 등에 올림
+        "application/json" => parse_json_data(content),
+        "text/csv" => parse_csv_data(content),
+        _ => Err(format!("지원하지 않는 MIME 타입: {}", mime_type)),
+    }
+}
+
+/// JSON 데이터 파싱
+fn parse_json_data(content: Vec<u8>) -> Result<Vec<CborValue>, String> {
+    let json: JsonValue =
+        serde_json::from_slice(&content).map_err(|e| format!("JSON 파싱 실패: {}", e))?;
+
+    let cbor = to_value(json).map_err(|e| format!("CBOR 변환 실패: {}", e))?;
+
+    // 배열이면 그대로 반환, 단일 값이면 배열로 래핑
+    match cbor {
+        CborValue::Array(arr) => Ok(arr),
+        other => Ok(vec![other]),
+    }
+}
+
+/// CSV 데이터 파싱
+fn parse_csv_data(content: Vec<u8>) -> Result<Vec<CborValue>, String> {
+    let mut rdr = ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(content.as_slice());
+
+    let mut results = Vec::new();
+
+    for result in rdr.records() {
+        let record = result.map_err(|e| format!("CSV 레코드 파싱 실패: {}", e))?;
+
+        let row: Vec<CborValue> = record
+            .iter()
+            .map(|field| CborValue::Text(field.to_string()))
+            .collect();
+
+        results.push(CborValue::Array(row));
+    }
+
+    if results.is_empty() {
+        return Err("CSV 데이터가 비어 있습니다".to_string());
+    }
+
+    Ok(results)
+}
+
+/// 데이터 크기 검증
+pub fn validate_data_size(content: &[u8], max_size: usize) -> Result<(), String> {
+    if content.len() > max_size {
+        return Err(format!(
+            "데이터 크기가 너무 큽니다. 최대 {}바이트, 현재 {}바이트",
+            max_size,
+            content.len()
+        ));
+    }
+    Ok(())
+}
+
+/// 지원되는 MIME 타입 검증
+pub fn validate_mime_type(mime_type: &str) -> Result<(), String> {
+    match mime_type {
+        "application/json" | "text/csv" => Ok(()),
         _ => Err(format!("지원하지 않는 MIME 타입: {}", mime_type)),
     }
 }
@@ -48,20 +85,63 @@ mod tests {
     use crate::validation::validate_data;
 
     #[test]
-    fn test_json_upload_and_validate() {
-        let raw = br#"[{"foo":"bar"},{"foo":"baz"}]"#.to_vec();
+    fn test_json_upload_single_object() {
+        let raw = br#"{"name": "Alice", "age": 30}"#.to_vec();
         let parsed = upload_data(raw, "application/json").unwrap();
-        // 두 개의 CBOR blob 이 들어와야 함
-        assert_eq!(parsed.len(), 2);
-        // validate_data 에러 없어야 함
+        assert_eq!(parsed.len(), 1);
         validate_data(&parsed).unwrap();
     }
 
     #[test]
-    fn test_csv_upload_and_validate() {
-        let raw = b"a,b\nx,y\n".to_vec();
-        let parsed = upload_data(raw, "text/csv").unwrap();
+    fn test_json_upload_array() {
+        let raw = br#"[{"foo":"bar"},{"foo":"baz"}]"#.to_vec();
+        let parsed = upload_data(raw, "application/json").unwrap();
         assert_eq!(parsed.len(), 2);
         validate_data(&parsed).unwrap();
+    }
+
+    #[test]
+    fn test_csv_upload() {
+        let raw = b"name,age\nAlice,30\nBob,25\n".to_vec();
+        let parsed = upload_data(raw, "text/csv").unwrap();
+        assert_eq!(parsed.len(), 3); // 헤더 + 2개 데이터
+        validate_data(&parsed).unwrap();
+    }
+
+    #[test]
+    fn test_empty_data() {
+        let raw = Vec::new();
+        let result = upload_data(raw, "application/json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_json() {
+        let raw = b"invalid json".to_vec();
+        let result = upload_data(raw, "application/json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unsupported_mime_type() {
+        let raw = b"some data".to_vec();
+        let result = upload_data(raw, "application/pdf");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mime_type_validation() {
+        assert!(validate_mime_type("application/json").is_ok());
+        assert!(validate_mime_type("text/csv").is_ok());
+        assert!(validate_mime_type("application/pdf").is_err());
+    }
+
+    #[test]
+    fn test_data_size_validation() {
+        let small_data = vec![0u8; 100];
+        let large_data = vec![0u8; 1000];
+
+        assert!(validate_data_size(&small_data, 500).is_ok());
+        assert!(validate_data_size(&large_data, 500).is_err());
     }
 }

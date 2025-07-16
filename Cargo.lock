@@ -42,6 +42,7 @@ dependencies = [
  "ic-cdk-macros 0.17.1",
  "ic-cdk-timers",
  "ic-llm",
+ "ic-stable-structures",
  "once_cell",
  "serde",
  "serde_cbor",
