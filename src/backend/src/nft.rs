@@ -14,9 +14,9 @@ static WORKER_CANISTER: Lazy<Principal> =
 
 thread_local! {
     /// 요청 카운터
-    static REQUEST_COUNT: RefCell<u64> = RefCell::new(0);
+    static REQUEST_COUNT: RefCell<u64> = const { RefCell::new(0) };
     /// 민팅 요청 큐: (request_id, MintRequest)
-    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = RefCell::new(VecDeque::new());
+    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = const { RefCell::new(VecDeque::new()) };
     /// request_id → MintStatus 매핑
     static MINT_STATUS: RefCell<HashMap<u64, MintStatus>> = RefCell::new(HashMap::new());
 }
