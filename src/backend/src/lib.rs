@@ -2,7 +2,6 @@
 
 // 매크로 및 타입 임포트
 use candid::Principal;
-use candid::{CandidType, Deserialize};
 use ic_cdk::api::call::call;
 use ic_cdk_macros::{init, query, update};
 use std::time::Duration;

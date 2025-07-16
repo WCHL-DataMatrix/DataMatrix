@@ -40,11 +40,11 @@ fn get_mint_counter_memory() -> Memory {
 
 // 저장소
 thread_local! {
-    static UPLOADED_DATA: RefCell<Option<StableBTreeMap<u64, DataBlob, Memory>>> = RefCell::new(None);
-    static MINT_REQUESTS: RefCell<Option<StableBTreeMap<u64, MintRequestData, Memory>>> = RefCell::new(None);
-    static MINT_STATUS_MAP: RefCell<Option<StableBTreeMap<u64, MintStatus, Memory>>> = RefCell::new(None);
-    static UPLOAD_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = RefCell::new(None);
-    static MINT_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = RefCell::new(None);
+    static UPLOADED_DATA: RefCell<Option<StableBTreeMap<u64, DataBlob, Memory>>> = const { RefCell::new(None) };
+    static MINT_REQUESTS: RefCell<Option<StableBTreeMap<u64, MintRequestData, Memory>>> = const { RefCell::new(None) };
+    static MINT_STATUS_MAP: RefCell<Option<StableBTreeMap<u64, MintStatus, Memory>>> = const { RefCell::new(None) };
+    static UPLOAD_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
+    static MINT_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
 }
 
 // =====================

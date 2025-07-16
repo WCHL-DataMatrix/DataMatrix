@@ -1,7 +1,7 @@
 // backend/src/nft.rs
 
 use crate::storage;
-use crate::types::{MintRequest, MintResponse, MintStatus};
+use crate::types::{MintResponse, MintStatus};
 use candid::Principal;
 use ic_cdk::api::call::call_with_payment;
 use once_cell::sync::Lazy;
