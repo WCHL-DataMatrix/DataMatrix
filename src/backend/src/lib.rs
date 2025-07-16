@@ -9,11 +9,16 @@ use std::time::Duration;
 
 // 모듈 선언
 mod nft;
+mod storage;
+mod types;
 mod upload;
 mod validation;
 
-// Re-export types from nft module
-pub use nft::{MintRequest, MintStatus, RequestResponse, TokenInfo};
+// Re-export types
+pub use types::{
+    DataInfo, MintRequest, MintRequestInfo, MintStatus, RequestResponse, StorageStats, TokenInfo,
+    UploadRequest, UploadResponse,
+};
 
 use once_cell::sync::Lazy;
 static WORKER_CANISTER_TEXT: &str = "bw4dl-smaaa-aaaaa-qaacq-cai";
@@ -24,31 +29,30 @@ static WORKER_CANISTER: Lazy<Principal> =
 // 1) Upload 인터페이스
 // =====================
 
-/// 업로드 요청: 바이너리 컨텐츠와 MIME 타입
-#[derive(CandidType, Deserialize)]
-pub struct UploadRequest {
-    pub content: Vec<u8>,
-    pub mime_type: String,
-}
-
-/// 업로드 응답: 각 레코드의 CBOR 직렬화 바이트 배열
-#[derive(CandidType)]
-pub struct UploadResponse {
-    pub data: Vec<Vec<u8>>,
-}
-
 /// Upload 엔드포인트
 #[update]
 pub fn upload(req: UploadRequest) -> Result<UploadResponse, String> {
-    // 1) 바이너리 → 파싱된 CBOR Value 벡터
+    // 1) MIME 타입 검증
+    upload::validate_mime_type(&req.mime_type)?;
+
+    // 2) 데이터 크기 검증 (10MB 제한)
+    upload::validate_data_size(&req.content, 10 * 1024 * 1024)?;
+
+    // 3) 바이너리 → 파싱된 CBOR Value 벡터
     let parsed = upload::upload_data(req.content, &req.mime_type)?;
-    // 2) 검증
+
+    // 4) 검증
     validation::validate_data(&parsed)?;
-    // 3) 각 Value를 CBOR -> 바이트로 재직렬화
-    let bytes = parsed
+
+    // 5) 저장소에 저장
+    let data_ids = storage::store_upload_data(parsed, &req.mime_type)?;
+
+    // 6) 데이터 ID를 바이트로 변환하여 반환
+    let bytes = data_ids
         .into_iter()
-        .map(|v| serde_cbor::to_vec(&v).map_err(|e| format!("CBOR 직렬화 실패: {}", e)))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|id| id.to_be_bytes().to_vec())
+        .collect();
+
     Ok(UploadResponse { data: bytes })
 }
 
@@ -59,13 +63,49 @@ pub fn upload(req: UploadRequest) -> Result<UploadResponse, String> {
 /// 민팅 요청을 큐에 추가
 #[update]
 pub fn request_mint(req: MintRequest) -> RequestResponse {
-    nft::request_mint_internal(req)
+    // validation 추가
+    if let Err(e) = validation::validate_mint_request(&req.cid, &req.metadata) {
+        ic_cdk::trap(&format!("민팅 요청 검증 실패: {}", e));
+    }
+
+    let request_id = storage::store_mint_request(req);
+    RequestResponse { request_id }
 }
 
 /// 민팅 요청 상태 조회
 #[query]
 pub fn get_mint_status(request_id: u64) -> Option<MintStatus> {
-    nft::get_mint_status_internal(request_id)
+    storage::get_mint_status(request_id)
+}
+
+/// 업로드된 데이터 조회
+#[query]
+pub fn get_uploaded_data(data_id: u64) -> Option<Vec<u8>> {
+    storage::get_uploaded_data(data_id)
+}
+
+/// 업로드된 데이터 목록 조회
+#[query]
+pub fn list_uploaded_data() -> Vec<DataInfo> {
+    storage::list_uploaded_data()
+}
+
+/// 민팅 요청 목록 조회
+#[query]
+pub fn list_mint_requests() -> Vec<MintRequestInfo> {
+    storage::list_mint_requests()
+}
+
+/// 저장소 통계 조회
+#[query]
+pub fn get_storage_stats() -> StorageStats {
+    storage::get_storage_stats()
+}
+
+/// 업로드된 데이터 삭제
+#[update]
+pub fn delete_uploaded_data(data_id: u64) -> Result<String, String> {
+    storage::delete_uploaded_data(data_id)
 }
 
 /// 특정 토큰 정보 조회
@@ -124,9 +164,12 @@ use ic_cdk_timers::set_timer_interval;
 
 #[init]
 fn init() {
+    // 저장소 초기화
+    storage::init_storage();
+
     // 10초마다 process_next_mint를 호출
     set_timer_interval(Duration::from_secs(10), || {
-        nft::spawn_next_mint();
+        nft::process_next_mint();
     });
 }
 

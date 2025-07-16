@@ -325,10 +325,10 @@ pub fn get_next_pending_mint() -> Option<(u64, MintRequest)> {
 /// 저장소 통계 조회
 pub fn get_storage_stats() -> StorageStats {
     let total_uploads: u64 =
-        UPLOAD_COUNTER.with(|counter| counter.borrow().as_ref().map_or(0, |c| c.get()));
+        UPLOAD_COUNTER.with(|counter| counter.borrow().as_ref().map_or(0, |c| *c.get()));
 
     let total_mint_requests: u64 =
-        MINT_COUNTER.with(|counter| counter.borrow().as_ref().map_or(0, |c| c.get()));
+        MINT_COUNTER.with(|counter| counter.borrow().as_ref().map_or(0, |c| *c.get()));
 
     let (pending_mints, completed_mints, failed_mints): (u64, u64, u64) =
         MINT_STATUS_MAP.with(|status_map| match status_map.borrow().as_ref() {

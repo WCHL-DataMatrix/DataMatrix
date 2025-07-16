@@ -1,7 +1,20 @@
+type DataInfo = record {
+  id : nat64;
+  mime_type : text;
+  timestamp : nat64;
+  size : nat64;
+};
 type MintRequest = record {
   cid : text;
   owner : opt principal;
   metadata : vec blob;
+};
+type MintRequestInfo = record {
+  request_id : nat64;
+  owner : opt principal;
+  cid : text;
+  status : MintStatus;
+  timestamp : nat64;
 };
 type MintStatus = variant {
   Failed : text;
@@ -11,15 +24,29 @@ type MintStatus = variant {
 };
 type RequestResponse = record { request_id : nat64 };
 type Result = variant { Ok : UploadResponse; Err : text };
+type Result_1 = variant { Ok : text; Err : text };
+type StorageStats = record {
+  total_uploads : nat64;
+  total_mint_requests : nat64;
+  pending_mints : nat64;
+  completed_mints : nat64;
+  failed_mints : nat64;
+  storage_size : nat64;
+};
 type TokenInfo = record { cid : text; owner : principal; metadata : vec blob };
 type UploadRequest = record { content : blob; mime_type : text };
 type UploadResponse = record { data : vec blob };
 service : () -> {
+  delete_uploaded_data : (nat64) -> (Result_1);
   get_mint_status : (nat64) -> (opt MintStatus) query;
+  get_storage_stats : () -> (StorageStats) query;
   get_token_info : (nat64) -> (opt TokenInfo) query;
   get_token_info_from_worker : (nat64) -> (opt TokenInfo);
+  get_uploaded_data : (nat64) -> (opt blob) query;
+  list_mint_requests : () -> (vec MintRequestInfo) query;
   list_tokens : () -> (vec nat64) query;
   list_tokens_from_worker : () -> (vec nat64);
+  list_uploaded_data : () -> (vec DataInfo) query;
   request_mint : (MintRequest) -> (RequestResponse);
   upload : (UploadRequest) -> (Result);
 }

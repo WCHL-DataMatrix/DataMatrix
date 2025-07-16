@@ -1,117 +1,50 @@
 // backend/src/nft.rs
 
-use candid::{CandidType, Deserialize, Principal};
+use crate::storage;
+use crate::types::{MintRequest, MintResponse, MintStatus};
+use candid::Principal;
 use ic_cdk::api::call::call_with_payment;
-use ic_cdk::api::call::RejectionCode;
 use once_cell::sync::Lazy;
-use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
 
-// 올바른 worker canister ID로 수정
+// Worker canister ID
 static WORKER_CANISTER_TEXT: &str = "bw4dl-smaaa-aaaaa-qaacq-cai";
 static WORKER_CANISTER: Lazy<Principal> =
     Lazy::new(|| Principal::from_text(WORKER_CANISTER_TEXT).expect("잘못된 워커 canister ID"));
 
-thread_local! {
-    /// 요청 카운터
-    static REQUEST_COUNT: RefCell<u64> = const { RefCell::new(0) };
-    /// 민팅 요청 큐: (request_id, MintRequest)
-    static MINT_QUEUE: RefCell<VecDeque<(u64, MintRequest)>> = const { RefCell::new(VecDeque::new()) };
-    /// request_id → MintStatus 매핑
-    static MINT_STATUS: RefCell<HashMap<u64, MintStatus>> = RefCell::new(HashMap::new());
-}
+/// 다음 민팅 요청 처리
+pub fn process_next_mint() {
+    // storage에서 다음 대기 중인 민팅 요청 가져오기
+    if let Some((request_id, req)) = storage::get_next_pending_mint() {
+        // 상태를 InProgress로 업데이트
+        if let Err(e) = storage::update_mint_status(request_id, MintStatus::InProgress) {
+            ic_cdk::println!("Failed to update mint status: {}", e);
+            return;
+        }
 
-/// 민팅 요청 구조체
-#[derive(CandidType, Deserialize, Clone)]
-pub struct MintRequest {
-    pub owner: Option<Principal>,
-    pub cid: String,
-    pub metadata: Vec<Vec<u8>>,
-}
-
-/// 민팅 응답
-#[derive(CandidType, Deserialize)]
-pub struct MintResponse {
-    pub token_id: u64,
-}
-
-/// 민팅 요청 상태
-#[derive(CandidType, Clone, PartialEq, Eq, Debug)]
-pub enum MintStatus {
-    Pending,
-    InProgress,
-    Completed(u64), // token_id
-    Failed(String),
-}
-
-/// 큐에 요청을 넣었을 때 반환되는 구조
-#[derive(CandidType)]
-pub struct RequestResponse {
-    pub request_id: u64,
-}
-
-/// 내부에 저장될 토큰 정보
-#[derive(CandidType, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct TokenInfo {
-    pub owner: Principal,
-    pub cid: String,
-    pub metadata: Vec<Vec<u8>>,
-}
-
-/// 민팅 요청을 큐에 추가
-pub fn request_mint_internal(req: MintRequest) -> RequestResponse {
-    // 새로운 request_id 생성
-    let request_id = REQUEST_COUNT.with(|c| {
-        let mut id = c.borrow_mut();
-        *id += 1;
-        *id
-    });
-    // 상태 = Pending
-    MINT_STATUS.with(|m| {
-        m.borrow_mut().insert(request_id, MintStatus::Pending);
-    });
-    // 큐에 삽입
-    MINT_QUEUE.with(|q| {
-        q.borrow_mut().push_back((request_id, req));
-    });
-    RequestResponse { request_id }
-}
-
-pub fn spawn_next_mint() {
-    // 1) 큐에서 하나 꺼내기
-    if let Some((request_id, req)) = MINT_QUEUE.with(|q| q.borrow_mut().pop_front()) {
-        // 2) 상태 → InProgress
-        MINT_STATUS.with(|m| {
-            m.borrow_mut().insert(request_id, MintStatus::InProgress);
-        });
-
-        // 3) worker canister에 "mint_nft" update call 비동기 요청
+        // 비동기로 worker canister 호출
         ic_cdk::spawn(async move {
-            let result: Result<(MintResponse,), (RejectionCode, String)> =
+            let result: Result<(MintResponse,), _> =
                 call_with_payment(*WORKER_CANISTER, "mint_nft", (req,), 0).await;
 
-            // 4) 결과에 따라 상태 업데이트
+            // 결과에 따라 상태 업데이트
             match result {
                 Ok((resp,)) => {
-                    MINT_STATUS.with(|m| {
-                        m.borrow_mut()
-                            .insert(request_id, MintStatus::Completed(resp.token_id));
-                    });
+                    if let Err(e) = storage::update_mint_status(
+                        request_id,
+                        MintStatus::Completed(resp.token_id),
+                    ) {
+                        ic_cdk::println!("Failed to update mint status to completed: {}", e);
+                    }
                 }
                 Err((code, msg)) => {
-                    MINT_STATUS.with(|m| {
-                        m.borrow_mut().insert(
-                            request_id,
-                            MintStatus::Failed(format!("code={:?}, msg={}", code, msg)),
-                        );
-                    });
+                    if let Err(e) = storage::update_mint_status(
+                        request_id,
+                        MintStatus::Failed(format!("code={:?}, msg={}", code, msg)),
+                    ) {
+                        ic_cdk::println!("Failed to update mint status to failed: {}", e);
+                    }
                 }
             }
         });
     }
-}
-
-/// 민팅 상태 조회
-pub fn get_mint_status_internal(request_id: u64) -> Option<MintStatus> {
-    MINT_STATUS.with(|m| m.borrow().get(&request_id).cloned())
 }
