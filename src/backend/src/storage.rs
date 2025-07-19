@@ -71,16 +71,16 @@ impl ic_stable_structures::Storable for DataHash {
 
 // 저장소
 thread_local! {
-    static UPLOADED_DATA: RefCell<Option<StableBTreeMap<u64, DataBlob, Memory>>> = RefCell::new(None);
-    static MINT_REQUESTS: RefCell<Option<StableBTreeMap<u64, MintRequestData, Memory>>> = RefCell::new(None);
-    static MINT_STATUS_MAP: RefCell<Option<StableBTreeMap<u64, MintStatus, Memory>>> = RefCell::new(None);
-    static UPLOAD_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = RefCell::new(None);
-    static MINT_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = RefCell::new(None);
+    static UPLOADED_DATA: RefCell<Option<StableBTreeMap<u64, DataBlob, Memory>>> = const { RefCell::new(None) };
+    static MINT_REQUESTS: RefCell<Option<StableBTreeMap<u64, MintRequestData, Memory>>> = const { RefCell::new(None) };
+    static MINT_STATUS_MAP: RefCell<Option<StableBTreeMap<u64, MintStatus, Memory>>> = const { RefCell::new(None) };
+    static UPLOAD_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
+    static MINT_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
 
     // 새로 추가: 데이터 해시 -> 데이터 ID 매핑
-    static DATA_HASHES: RefCell<Option<StableBTreeMap<DataHash, u64, Memory>>> = RefCell::new(None);
+    static DATA_HASHES: RefCell<Option<StableBTreeMap<DataHash, u64, Memory>>> = const { RefCell::new(None) };
     // 새로 추가: 민팅된 데이터 해시 집합
-    static MINTED_HASHES: RefCell<Option<StableBTreeMap<DataHash, u64, Memory>>> = RefCell::new(None);
+    static MINTED_HASHES: RefCell<Option<StableBTreeMap<DataHash, u64, Memory>>> = const { RefCell::new(None) };
 }
 
 // =====================
