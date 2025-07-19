@@ -1,8 +1,84 @@
+type ActivityLog = record {
+  activity_type : ActivityType;
+  user : principal;
+  timestamp : nat64;
+  details : text;
+  listing_id : opt nat64;
+};
+type ActivityType = variant {
+  ListingUpdated;
+  ListingSold;
+  ListingViewed;
+  ListingCreated;
+  ListingDeleted;
+  ListingFavorited;
+};
+type CategoryStats = record {
+  count : nat64;
+  category : text;
+  avg_price : nat64;
+};
+type CreateListingRequest = record {
+  title : text;
+  tags : vec text;
+  description : text;
+  data_ids : vec nat64;
+  currency : text;
+  preview_data : opt text;
+  category : text;
+  price : nat64;
+};
 type DataInfo = record {
   id : nat64;
+  size : nat64;
   mime_type : text;
   timestamp : nat64;
-  size : nat64;
+};
+type FavoriteRequest = record { listing_id : nat64 };
+type Listing = record {
+  id : nat64;
+  status : ListingStatus;
+  title : text;
+  updated_at : nat64;
+  tags : vec text;
+  view_count : nat64;
+  description : text;
+  created_at : nat64;
+  seller : principal;
+  data_ids : vec nat64;
+  currency : text;
+  preview_data : opt text;
+  category : text;
+  price : nat64;
+  favorite_count : nat64;
+};
+type ListingDetail = record { listing : Listing; data_info : vec DataInfo };
+type ListingStatus = variant { Sold; Active; Suspended; Deleted };
+type ListingSummary = record {
+  id : nat64;
+  status : ListingStatus;
+  title : text;
+  updated_at : nat64;
+  tags : vec text;
+  view_count : nat64;
+  description : text;
+  created_at : nat64;
+  seller : principal;
+  currency : text;
+  category : text;
+  price : nat64;
+  favorite_count : nat64;
+  data_count : nat64;
+};
+type MarketplaceStats = record {
+  categories : vec CategoryStats;
+  active_listings : nat64;
+  total_sellers : nat64;
+  total_favorites : nat64;
+  total_listings : nat64;
+  recent_activity : vec ActivityLog;
+  total_views : nat64;
+  sold_listings : nat64;
 };
 type MintRequest = record {
   cid : text;
@@ -10,10 +86,10 @@ type MintRequest = record {
   metadata : vec blob;
 };
 type MintRequestInfo = record {
-  request_id : nat64;
-  owner : opt principal;
   cid : text;
+  request_id : nat64;
   status : MintStatus;
+  owner : opt principal;
   timestamp : nat64;
 };
 type MintStatus = variant {
@@ -23,33 +99,124 @@ type MintStatus = variant {
   Pending;
 };
 type RequestResponse = record { request_id : nat64 };
-type Result = variant { Ok : UploadResponse; Err : text };
-type Result_1 = variant { Ok : text; Err : text };
-type StorageStats = record {
-  total_uploads : nat64;
-  total_mint_requests : nat64;
-  pending_mints : nat64;
-  completed_mints : nat64;
-  failed_mints : nat64;
-  storage_size : nat64;
+type Result = variant { Ok : SuccessResponse; Err : text };
+type Result_1 = variant { Ok : SearchResult; Err : text };
+type Result_2 = variant { Ok : FavoriteRequest; Err : text };
+type Result_3 = variant { Ok : text; Err : text };
+type Result_4 = variant { Ok : SearchStats; Err : text };
+type Result_5 = variant { Ok : UploadResponse; Err : text };
+type SearchListingsRequest = record {
+  sort_by : opt SortBy;
+  status : opt ListingStatus;
+  page_size : opt nat64;
+  page : opt nat64;
+  tags : opt vec text;
+  "query" : opt text;
+  seller : opt principal;
+  currency : opt text;
+  category : opt text;
+  max_price : opt nat64;
+  min_price : opt nat64;
 };
+type SearchResult = record {
+  page_size : nat64;
+  listings : vec ListingSummary;
+  page : nat64;
+  total_pages : nat64;
+  total_count : nat64;
+};
+type SearchStats = record {
+  total_results : nat64;
+  top_categories : vec record { text; nat64 };
+  avg_price : nat64;
+  top_sellers : vec record { principal; nat64 };
+  price_range : record { nat64; nat64 };
+};
+type SortBy = variant {
+  PriceDesc;
+  CreatedAtAsc;
+  UpdatedAtDesc;
+  CreatedAtDesc;
+  ViewCountDesc;
+  FavoriteCountDesc;
+  PriceAsc;
+};
+type StorageStats = record {
+  storage_size : nat64;
+  completed_mints : nat64;
+  total_mint_requests : nat64;
+  failed_mints : nat64;
+  pending_mints : nat64;
+  total_uploads : nat64;
+};
+type SuccessResponse = record { message : text };
 type TokenInfo = record { cid : text; owner : principal; metadata : vec blob };
+type UpdateListingRequest = record {
+  status : opt ListingStatus;
+  title : opt text;
+  tags : opt vec text;
+  description : opt text;
+  currency : opt text;
+  preview_data : opt text;
+  category : opt text;
+  listing_id : nat64;
+  price : opt nat64;
+};
 type UploadRequest = record { content : blob; mime_type : text };
 type UploadResponse = record { data : vec blob };
 service : () -> {
+  add_favorite : (FavoriteRequest) -> (Result);
+  admin_delete_listing : (nat64) -> (Result);
+  advanced_search : (
+      opt text,
+      opt text,
+      opt nat64,
+      opt nat64,
+      opt vec text,
+      opt principal,
+      opt SortBy,
+      opt nat64,
+    ) -> (Result_1) query;
   check_data_exists : (blob) -> (opt nat64) query;
   check_data_minted : (blob) -> (bool) query;
-  check_multiple_data_status : (vec blob) -> (vec record { opt nat64; bool }) query;
-  delete_uploaded_data : (nat64) -> (Result_1);
+  check_multiple_data_status : (vec blob) -> (
+      vec record { opt nat64; bool },
+    ) query;
+  cleanup_inactive_listings : () -> (nat64);
+  create_listing : (CreateListingRequest) -> (Result_2);
+  delete_listing : (nat64) -> (Result);
+  delete_uploaded_data : (nat64) -> (Result_3);
+  get_categories : () -> (vec record { text; nat64 }) query;
+  get_listing_detail : (nat64) -> (opt ListingDetail) query;
+  get_marketplace_stats : () -> (MarketplaceStats) query;
   get_mint_status : (nat64) -> (opt MintStatus) query;
+  get_my_favorites : () -> (vec ListingSummary) query;
+  get_my_listings : () -> (vec ListingSummary) query;
+  get_popular_tags : (opt nat64) -> (vec record { text; nat64 }) query;
+  get_recent_activities : (opt nat64) -> (vec ActivityLog) query;
+  get_recommended_listings : (nat64) -> (vec ListingSummary) query;
+  get_related_keywords : (text) -> (vec text) query;
+  get_search_stats : (SearchListingsRequest) -> (Result_4) query;
+  get_search_suggestions : (text, opt nat64) -> (vec text) query;
+  get_similar_listings : (nat64, nat64) -> (vec ListingSummary) query;
   get_storage_stats : () -> (StorageStats) query;
   get_token_info : (nat64) -> (opt TokenInfo) query;
   get_token_info_from_worker : (nat64) -> (opt TokenInfo);
+  get_trending_by_search : () -> (vec ListingSummary) query;
+  get_trending_keywords : (opt nat64) -> (vec record { text; nat32 }) query;
+  get_trending_listings : () -> (vec ListingSummary) query;
   get_uploaded_data : (nat64) -> (opt blob) query;
+  get_user_listings : (principal) -> (vec ListingSummary) query;
+  is_favorited : (nat64) -> (bool) query;
+  list_listings : (opt ListingStatus, opt nat64) -> (vec ListingSummary) query;
   list_mint_requests : () -> (vec MintRequestInfo) query;
   list_tokens : () -> (vec nat64) query;
   list_tokens_from_worker : () -> (vec nat64);
   list_uploaded_data : () -> (vec DataInfo) query;
+  normalize_search_query : (text) -> (text) query;
+  remove_favorite : (FavoriteRequest) -> (Result);
   request_mint : (MintRequest) -> (RequestResponse);
-  upload : (UploadRequest) -> (Result);
+  search_listings : (SearchListingsRequest) -> (Result_1) query;
+  update_listing : (UpdateListingRequest) -> (Result);
+  upload : (UploadRequest) -> (Result_5);
 }

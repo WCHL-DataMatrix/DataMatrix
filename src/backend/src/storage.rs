@@ -546,3 +546,47 @@ pub fn get_storage_stats() -> StorageStats {
         storage_size,
     }
 }
+
+// storage.rs 파일 끝에 추가할 함수들
+
+/// 특정 데이터 ID의 정보 조회
+pub fn get_uploaded_data_info(data_id: u64) -> Option<crate::types::DataInfo> {
+    UPLOADED_DATA.with(|storage| {
+        let storage = storage.borrow();
+        storage
+            .as_ref()
+            .and_then(|s| s.get(&data_id))
+            .map(|blob| crate::types::DataInfo {
+                id: data_id,
+                mime_type: blob.mime_type.clone(),
+                timestamp: blob.timestamp,
+                size: blob.data.len() as u64,
+            })
+    })
+}
+
+/// 여러 데이터 ID의 정보를 한번에 조회
+pub fn get_multiple_data_info(data_ids: &[u64]) -> Vec<crate::types::DataInfo> {
+    data_ids
+        .iter()
+        .filter_map(|&data_id| get_uploaded_data_info(data_id))
+        .collect()
+}
+
+/// 데이터 ID가 존재하는지 확인
+pub fn data_id_exists(data_id: u64) -> bool {
+    UPLOADED_DATA.with(|storage| {
+        let storage = storage.borrow();
+        storage.as_ref().map_or(false, |s| s.contains_key(&data_id))
+    })
+}
+
+/// 여러 데이터 ID가 모두 존재하는지 확인
+pub fn validate_data_ids_exist(data_ids: &[u64]) -> Result<(), String> {
+    for &data_id in data_ids {
+        if !data_id_exists(data_id) {
+            return Err(format!("데이터 ID {}를 찾을 수 없습니다", data_id));
+        }
+    }
+    Ok(())
+}
