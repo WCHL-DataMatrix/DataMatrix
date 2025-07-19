@@ -326,7 +326,7 @@ pub fn smart_search_listings(request: &SearchListingsRequest) -> SearchResult {
     let total_count = filtered_listings.len() as u64;
     let page = request.get_page();
     let page_size = request.get_page_size();
-    let total_pages = (total_count + page_size - 1) / page_size;
+    let total_pages = total_count.div_ceil(page_size);
 
     let start = (page * page_size) as usize;
     let end = ((page + 1) * page_size).min(total_count) as usize;

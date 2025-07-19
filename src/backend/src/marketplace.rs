@@ -745,7 +745,7 @@ pub fn get_similar_listings(listing_id: u64, limit: u64) -> Vec<ListingSummary> 
 
     let mut all_keywords: Vec<String> = title_keywords
         .into_iter()
-        .chain(desc_keywords.into_iter())
+        .chain(desc_keywords)
         .chain(target_listing.tags.iter().cloned())
         .filter(|keyword| keyword.len() >= 2)
         .take(5) // 상위 5개 키워드만 사용
