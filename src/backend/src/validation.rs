@@ -1,5 +1,6 @@
 // backend/src/validation.rs
 
+use crate::storage;
 use serde_cbor::value::Value as CborValue;
 use std::collections::HashSet;
 
@@ -23,8 +24,11 @@ pub fn validate_data(data: &[CborValue]) -> Result<(), String> {
         validate_record(record, index)?;
     }
 
-    // 4. 중복 데이터 검증
+    // 4. 업로드 데이터 내 중복 검증
     validate_duplicates(data)?;
+
+    // 5. 기존 민팅된 데이터와의 중복 검증
+    validate_against_minted_data(data)?;
 
     Ok(())
 }
@@ -100,6 +104,45 @@ fn validate_duplicates(data: &[CborValue]) -> Result<(), String> {
     Ok(())
 }
 
+/// 기존 민팅된 데이터와의 중복 검증
+fn validate_against_minted_data(data: &[CborValue]) -> Result<(), String> {
+    let mut minted_indices = Vec::new();
+    let mut existing_indices = Vec::new();
+
+    // 각 데이터를 직렬화하여 중복 검사
+    for (index, record) in data.iter().enumerate() {
+        if let Ok(bytes) = serde_cbor::to_vec(record) {
+            // storage에서 중복 검사
+            let status = storage::check_multiple_data_status(&[bytes]);
+            if let Some((existing_id, is_minted)) = status.first() {
+                if *is_minted {
+                    minted_indices.push(index);
+                } else if existing_id.is_some() {
+                    existing_indices.push((index, existing_id.unwrap()));
+                }
+            }
+        }
+    }
+
+    // 이미 민팅된 데이터가 있으면 에러
+    if !minted_indices.is_empty() {
+        return Err(format!(
+            "이미 민팅된 데이터가 포함되어 있습니다. 인덱스: {:?}",
+            minted_indices
+        ));
+    }
+
+    // 이미 업로드되었지만 민팅되지 않은 데이터는 경고만
+    if !existing_indices.is_empty() {
+        ic_cdk::println!(
+            "이미 업로드된 데이터가 포함되어 있습니다 (민팅은 가능): {:?}",
+            existing_indices
+        );
+    }
+
+    Ok(())
+}
+
 /// 민팅 요청 검증
 pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), String> {
     // 1. CID 형식 검증
@@ -135,6 +178,21 @@ pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), Stri
                 data.len()
             ));
         }
+    }
+
+    // 4. 이미 민팅된 데이터인지 확인
+    let mut already_minted = Vec::new();
+    for (index, data) in metadata.iter().enumerate() {
+        if storage::check_data_minted(data) {
+            already_minted.push(index);
+        }
+    }
+
+    if !already_minted.is_empty() {
+        return Err(format!(
+            "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: {:?}",
+            already_minted
+        ));
     }
 
     Ok(())

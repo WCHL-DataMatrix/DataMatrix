@@ -37,6 +37,9 @@ type TokenInfo = record { cid : text; owner : principal; metadata : vec blob };
 type UploadRequest = record { content : blob; mime_type : text };
 type UploadResponse = record { data : vec blob };
 service : () -> {
+  check_data_exists : (blob) -> (opt nat64) query;
+  check_data_minted : (blob) -> (bool) query;
+  check_multiple_data_status : (vec blob) -> (vec record { opt nat64; bool }) query;
   delete_uploaded_data : (nat64) -> (Result_1);
   get_mint_status : (nat64) -> (opt MintStatus) query;
   get_storage_stats : () -> (StorageStats) query;
