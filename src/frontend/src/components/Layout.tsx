@@ -1,0 +1,121 @@
+import { useState } from "react";
+import { Sidebar } from "./Sidebar";
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export function Layout({ children }: LayoutProps) {
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+
+  const toggleSidebar = () => {
+    setSidebarExpanded(!sidebarExpanded);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Sidebar */}
+      <Sidebar isExpanded={sidebarExpanded} onToggle={toggleSidebar} />
+
+      {/* Main Content */}
+      <div
+        className={`transition-all duration-300 ${
+          sidebarExpanded ? "ml-64" : "ml-16"
+        }`}
+      >
+        {/* Top Header */}
+        <header className="border-b border-gray-800 bg-gray-900 px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Search Bar */}
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={toggleSidebar}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+              >
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                </svg>
+              </button>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="w-80 rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 pl-10 text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
+                />
+                <svg
+                  className="absolute top-2.5 left-3 h-5 w-5 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+            </div>
+
+            {/* Right Side Actions */}
+            <div className="flex items-center space-x-4">
+              {/* Notifications */}
+              <button className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-5 5v-5zM10.586 3L7 6.586A2 2 0 007 10h0a2 2 0 000 4v0a2 2 0 00-1.414 1.414L9 19h6l3.414-3.414A2 2 0 0017 14h0a2 2 0 000-4v0a2 2 0 001.414-1.414L15 5H10.586z"
+                  />
+                </svg>
+              </button>
+
+              {/* Connect Wallet Button */}
+              <button className="rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700">
+                Connect Wallet
+              </button>
+
+              {/* Profile */}
+              <button className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white">
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="p-6">{children}</main>
+      </div>
+    </div>
+  );
+}
