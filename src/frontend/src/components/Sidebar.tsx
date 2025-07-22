@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps {
   isExpanded: boolean;
-  onToggle: () => void;
+  onExpandedChange: (expanded: boolean) => void;
 }
 
 const navigationItems = [
@@ -175,14 +175,24 @@ const navigationItems = [
   },
 ];
 
-export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
+export function Sidebar({ isExpanded, onExpandedChange }: SidebarProps) {
   const location = useLocation();
+
+  const handleMouseEnter = () => {
+    onExpandedChange(true);
+  };
+
+  const handleMouseLeave = () => {
+    onExpandedChange(false);
+  };
 
   return (
     <div
       className={`fixed top-0 left-0 z-50 h-screen border-r border-gray-800 bg-gray-900 transition-all duration-300 ${
         isExpanded ? "w-64" : "w-16"
       }`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Navigation Items */}
       <nav className="flex flex-col pt-6">
@@ -193,7 +203,7 @@ export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
             <Link
               key={item.id}
               to={item.path}
-              className={`group mx-2 flex items-center rounded-lg px-4 py-3 transition-colors duration-200 ${
+              className={`group relative mx-2 flex items-center rounded-lg px-4 py-3 transition-colors duration-200 ${
                 isActive
                   ? "bg-purple-600 text-white"
                   : "text-gray-400 hover:bg-gray-800 hover:text-white"
@@ -201,13 +211,27 @@ export function Sidebar({ isExpanded, onToggle }: SidebarProps) {
             >
               <div className="flex-shrink-0">{item.icon}</div>
 
-              {isExpanded && (
-                <span className="ml-3 text-sm font-medium">{item.label}</span>
-              )}
+              {/* Label with smooth transition */}
+              <span
+                className={`ml-3 text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+                  isExpanded
+                    ? "translate-x-0 opacity-100"
+                    : "pointer-events-none -translate-x-2 opacity-0"
+                }`}
+              >
+                {item.label}
+              </span>
 
-              {/* Active indicator */}
+              {/* Active indicator for collapsed state */}
               {isActive && !isExpanded && (
                 <div className="absolute left-0 h-6 w-1 rounded-r bg-purple-600"></div>
+              )}
+
+              {/* Tooltip for collapsed state */}
+              {!isExpanded && (
+                <div className="pointer-events-none absolute left-16 z-50 rounded-md bg-gray-800 px-2 py-1 text-sm whitespace-nowrap text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  {item.label}
+                </div>
               )}
             </Link>
           );

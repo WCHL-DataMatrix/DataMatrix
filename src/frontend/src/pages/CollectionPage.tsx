@@ -291,7 +291,7 @@ export function CollectionPage() {
 
       {/* Bottom Action Bar */}
       <div className="fixed right-0 bottom-0 left-0 z-40 border-t border-gray-800 bg-gray-900 p-4">
-        <div className="ml-64 transition-all duration-300">
+        <div className="ml-16 transition-all duration-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button className="rounded-lg bg-purple-600 px-6 py-2 font-medium text-white transition-colors hover:bg-purple-700">

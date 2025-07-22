@@ -6,16 +6,15 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
-
-  const toggleSidebar = () => {
-    setSidebarExpanded(!sidebarExpanded);
-  };
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Sidebar */}
-      <Sidebar isExpanded={sidebarExpanded} onToggle={toggleSidebar} />
+      <Sidebar
+        isExpanded={sidebarExpanded}
+        onExpandedChange={setSidebarExpanded}
+      />
 
       {/* Main Content */}
       <div
@@ -28,25 +27,6 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between">
             {/* Search Bar */}
             <div className="flex items-center space-x-4">
-              <button
-                onClick={toggleSidebar}
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
-              >
-                <svg
-                  className="h-5 w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
-              </button>
-
               <div className="relative">
                 <input
                   type="text"
@@ -71,7 +51,7 @@ export function Layout({ children }: LayoutProps) {
 
             {/* Right Side Actions */}
             <div className="flex items-center space-x-4">
-              {/* Notifications */}
+              {/* Wallet Icon */}
               <button className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white">
                 <svg
                   className="h-5 w-5"
@@ -83,7 +63,7 @@ export function Layout({ children }: LayoutProps) {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M15 17h5l-5 5v-5zM10.586 3L7 6.586A2 2 0 007 10h0a2 2 0 000 4v0a2 2 0 00-1.414 1.414L9 19h6l3.414-3.414A2 2 0 0017 14h0a2 2 0 000-4v0a2 2 0 001.414-1.414L15 5H10.586z"
+                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
                   />
                 </svg>
               </button>
