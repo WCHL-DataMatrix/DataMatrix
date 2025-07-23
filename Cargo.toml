@@ -1,6 +1,28 @@
+# Cargo.toml - 프로젝트 루트에 생성
 [workspace]
 members = [
     "src/backend",
     "worker"
 ]
 resolver = "2"
+
+# 통합 테스트 설정
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
+
+# 개발용 의존성 (workspace 전체)
+[workspace.dev-dependencies]
+tokio-test = "0.4"
+rstest = "0.21"
+
+# 테스트용 프로파일
+[profile.test]
+opt-level = 0
+debug = true
+overflow-checks = true
+
+# workspace에서 backend 라이브러리 의존성 설정
+[dev-dependencies]
+backend = { path = "src/backend" }
+candid = "0.10"

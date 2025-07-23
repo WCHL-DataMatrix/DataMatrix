@@ -20,3 +20,19 @@ sha2 = "0.10"
 csv = "1.1"
 once_cell = "1.21.3"
 ic-stable-structures = "0.6"
+
+# 테스트 전용 의존성
+[dev-dependencies]
+tokio-test = "0.4"
+rstest = "0.21"
+
+# 테스트 설정
+[[test]]
+name = "integration_tests"
+path = "../../tests/integration_tests.rs"
+
+# 테스트 프로파일 설정
+[profile.test]
+opt-level = 0
+debug = true
+overflow-checks = true
