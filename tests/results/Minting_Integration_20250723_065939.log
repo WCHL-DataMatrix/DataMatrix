@@ -1,0 +1,15 @@
+=== Minting Integration Test ===
+Starting Minting Integration Test Suite
+=======================================
+Checking test environment...
+Warning: Worker canister not found. Will deploy during test.
+Backend Canister ID: bkyz2-fmaaa-aaaaa-qaaaq-cai
+Current Identity: codespace_dev
+Current Principal: cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae
+
+--- Deploying Worker Canister ---
+Building and deploying worker canister...
+[31mError: (B[mFailed while trying to deploy canisters.
+[33mCaused by: (B[mFailed to collect canisters and their dependencies.
+[33mCaused by: (B[mFailed to add dependencies for canister 'worker'
+[33mCaused by: (B[mCanister 'worker' not found in dfx.json.

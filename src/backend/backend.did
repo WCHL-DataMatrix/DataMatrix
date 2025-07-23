@@ -207,6 +207,7 @@ service : () -> {
   get_trending_listings : () -> (vec ListingSummary) query;
   get_uploaded_data : (nat64) -> (opt blob) query;
   get_user_listings : (principal) -> (vec ListingSummary) query;
+  init_storage_manual : () -> (text);
   is_favorited : (nat64) -> (bool) query;
   list_listings : (opt ListingStatus, opt nat64) -> (vec ListingSummary) query;
   list_mint_requests : () -> (vec MintRequestInfo) query;

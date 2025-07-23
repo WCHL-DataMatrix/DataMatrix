@@ -1,0 +1,220 @@
+=== Minting Integration Test ===
+Starting Minting Integration Test Suite
+=======================================
+Checking test environment...
+Backend Canister ID: bkyz2-fmaaa-aaaaa-qaaaq-cai
+Checking storage initialization...
+✅ Storage already initialized
+Worker Canister ID: be2us-64aaa-aaaaa-qaabq-cai
+Current Identity: codespace_dev
+Current Principal: cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae
+
+--- Preparing Test Data for Minting ---
+Test data prepared for minting tests
+
+Starting minting integration tests...
+
+--- Setting up Data for Minting ---
+Uploading JSON data for minting...
+✅ Data uploaded successfully for minting
+Uploaded data ID bytes: 
+
+--- Mint Test 1: Valid Mint Request ---
+❌ FAIL: Valid Mint Request
+Error output:
+[31mError: (B[mFailed update call.
+[33mCaused by: (B[mThe replica returned a rejection error: reject code CanisterError, reject message Error from Canister bkyz2-fmaaa-aaaaa-qaaaq-cai: Canister called `ic0.trap` with message: Panicked at 'Mint counter not initialized', src/backend/src/storage.rs:372:13
+Canister Backtrace:
+ic_cdk::api::trap
+ic_cdk::printer::set_panic_hook::{{closure}}
+std::panicking::rust_panic_with_hook
+std::panicking::begin_panic_handler::{{closure}}
+std::sys::backtrace::__rust_end_short_backtrace
+rust_begin_unwind
+core::panicking::panic_fmt
+std::thread::local::LocalKey<T>::with
+backend::request_mint
+backend::__canister_method_request_mint::{{closure}}
+ic_cdk::futures::spawn
+canister_update request_mint
+.
+Consider gracefully handling failures from this canister or altering the canister to handle exceptions. See documentation: http://internetcomputer.org/docs/current/references/execution-errors#trapped-explicitly, error code Some("IC0503")
+
+--- Mint Test 2: Invalid CID Mint Request ---
+✅ PASS: Invalid CID Mint Request (expected failure)
+
+--- Mint Test 3: Empty Metadata Mint Request ---
+✅ PASS: Empty Metadata Mint Request (expected failure)
+
+--- Mint Test 4: Large Metadata Mint Request ---
+❌ FAIL: Large Metadata Mint Request
+Error output:
+[31mError: (B[mFailed update call.
+[33mCaused by: (B[mThe replica returned a rejection error: reject code CanisterError, reject message Error from Canister bkyz2-fmaaa-aaaaa-qaaaq-cai: Canister called `ic0.trap` with message: Panicked at 'Mint counter not initialized', src/backend/src/storage.rs:372:13
+Canister Backtrace:
+ic_cdk::api::trap
+ic_cdk::printer::set_panic_hook::{{closure}}
+std::panicking::rust_panic_with_hook
+std::panicking::begin_panic_handler::{{closure}}
+std::sys::backtrace::__rust_end_short_backtrace
+rust_begin_unwind
+core::panicking::panic_fmt
+std::thread::local::LocalKey<T>::with
+backend::request_mint
+backend::__canister_method_request_mint::{{closure}}
+ic_cdk::futures::spawn
+canister_update request_mint
+.
+Consider gracefully handling failures from this canister or altering the canister to handle exceptions. See documentation: http://internetcomputer.org/docs/current/references/execution-errors#trapped-explicitly, error code Some("IC0503")
+
+--- Mint Test 5: Different Owner Mint Request ---
+❌ FAIL: Different Owner Mint Request
+Error output:
+[0m[1m[38;5;9merror[0m[1m: parser error[0m
+  [0m[34m┌─[0m Candid argument:1:33
+  [0m[34m│[0m
+[0m[34m1[0m [0m[34m│[0m (record { owner = opt principal [0m[31m"rdmx6-jaaaa-aaaah-qcaiq-cai"[0m; cid = "QmTestOther"; metadata = vec { vec { 111; 116; 104; 101; 114 } } })
+  [0m[34m│[0m                                 [0m[31m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m [0m[31mCRC32 check sequence doesn't match with calculated from Principal bytes.[0m
+
+[31mError: (B[mFailed to create argument blob.
+[33mCaused by: (B[mInvalid data: Unable to serialize Candid values: Invalid argument: Invalid Candid values: Candid parser error: CRC32 check sequence doesn't match with calculated from Principal bytes. at 32..61
+
+--- Testing Mint Status Queries ---
+
+--- Mint Test 6: Invalid Mint Status Query ---
+✅ PASS: Invalid Mint Status Query
+Note: Invalid request ID should return null/none
+
+--- Mint Test 7: List Mint Requests ---
+✅ PASS: List Mint Requests
+
+--- Actual Minting Process ---
+⚠️  SKIPPED: Worker canister not available
+💡 Minting requests are queued but not processed without worker
+
+--- Testing Duplicate Minting Prevention ---
+
+--- Mint Test 8: Duplicate Metadata Mint Attempt ---
+✅ PASS: Duplicate Metadata Mint Attempt (expected failure)
+Note: Duplicate metadata should be rejected
+
+--- Testing Worker Canister Communication ---
+
+--- Mint Test 9: List Tokens from Worker ---
+✅ PASS: List Tokens from Worker
+
+--- Testing Minted Data Status ---
+
+--- Mint Test 10: Check Minted Data Status ---
+✅ PASS: Check Minted Data Status
+
+--- Testing Storage Stats After Minting ---
+
+--- Mint Test 11: Storage Stats After Minting ---
+✅ PASS: Storage Stats After Minting
+
+--- Testing Edge Cases ---
+
+--- Mint Test 12: Very Long CID Test ---
+✅ PASS: Very Long CID Test (expected failure)
+
+--- Mint Test 13: Special Characters CID Test ---
+✅ PASS: Special Characters CID Test (expected failure)
+Testing maximum metadata count...
+
+--- Mint Test 14: Maximum Metadata Count Test ---
+❌ FAIL: Maximum Metadata Count Test
+Error output:
+[31mError: (B[mFailed update call.
+[33mCaused by: (B[mThe replica returned a rejection error: reject code CanisterError, reject message Error from Canister bkyz2-fmaaa-aaaaa-qaaaq-cai: Canister called `ic0.trap` with message: Panicked at 'Mint counter not initialized', src/backend/src/storage.rs:372:13
+Canister Backtrace:
+ic_cdk::api::trap
+ic_cdk::printer::set_panic_hook::{{closure}}
+std::panicking::rust_panic_with_hook
+std::panicking::begin_panic_handler::{{closure}}
+std::sys::backtrace::__rust_end_short_backtrace
+rust_begin_unwind
+core::panicking::panic_fmt
+std::thread::local::LocalKey<T>::with
+backend::request_mint
+backend::__canister_method_request_mint::{{closure}}
+ic_cdk::futures::spawn
+canister_update request_mint
+.
+Consider gracefully handling failures from this canister or altering the canister to handle exceptions. See documentation: http://internetcomputer.org/docs/current/references/execution-errors#trapped-explicitly, error code Some("IC0503")
+Testing excessive metadata count...
+
+--- Mint Test 15: Excessive Metadata Count Test ---
+✅ PASS: Excessive Metadata Count Test (expected failure)
+
+--- Performance and Stress Tests ---
+Testing concurrent mint requests...
+Concurrent requests completed
+❌ FAIL: Concurrent Mint Requests (0/5)
+
+--- Final State Verification ---
+Final storage statistics:
+(
+  record {
+    storage_size = 0 : nat64;
+    completed_mints = 0 : nat64;
+    total_mint_requests = 0 : nat64;
+    failed_mints = 0 : nat64;
+    pending_mints = 0 : nat64;
+    total_uploads = 0 : nat64;
+  },
+)
+
+Final mint requests list:
+(vec {})
+
+Tokens from worker canister:
+(vec {})
+
+Checking minted token details...
+Found minted tokens, checking details...
+(null)
+
+========================================
+Minting Integration Test Results
+========================================
+Total Tests: 16
+Passed: 11
+Failed: 5
+
+❌ SOME MINTING TESTS FAILED
+Success Rate: 68%
+
+Detailed Results:
+  FAIL: Valid Mint Request
+  PASS: Invalid CID Mint Request (expected failure)
+  PASS: Empty Metadata Mint Request (expected failure)
+  FAIL: Large Metadata Mint Request
+  FAIL: Different Owner Mint Request
+  PASS: Invalid Mint Status Query
+  PASS: List Mint Requests
+  PASS: Duplicate Metadata Mint Attempt (expected failure)
+  PASS: List Tokens from Worker
+  PASS: Check Minted Data Status
+  PASS: Storage Stats After Minting
+  PASS: Very Long CID Test (expected failure)
+  PASS: Special Characters CID Test (expected failure)
+  FAIL: Maximum Metadata Count Test
+  PASS: Excessive Metadata Count Test (expected failure)
+  FAIL: Concurrent Mint Requests
+
+Key Metrics:
+============
+  Total Uploads: 0
+  Total Mint Requests: 0
+  Completed Mints: 0
+  Pending Mints: 0
+  Failed Mints: 0
+  Tokens in Worker Canister: 0
+
+--- Cleaning up test files ---
+Cleanup completed
+
+=== Minting Integration Test Completed ===
+
+❌ Test suite failed due to low success rate

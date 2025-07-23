@@ -7,7 +7,7 @@ use ic_cdk::api::call::call_with_payment;
 use once_cell::sync::Lazy;
 
 // Worker canister ID
-static WORKER_CANISTER_TEXT: &str = "uxrrr-q7777-77774-qaaaq-cai";
+static WORKER_CANISTER_TEXT: &str = "be2us-64aaa-aaaaa-qaabq-cai";
 static WORKER_CANISTER: Lazy<Principal> =
     Lazy::new(|| Principal::from_text(WORKER_CANISTER_TEXT).expect("잘못된 워커 canister ID"));
 

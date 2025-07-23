@@ -1,0 +1,158 @@
+=== Upload & Validation Integration Test ===
+Initializing test environment...
+Backend Canister ID: bkyz2-fmaaa-aaaaa-qaaaq-cai
+Starting upload and validation tests...
+
+--- Test 1: Valid JSON Upload ---
+✅ PASS: Valid JSON Upload
+
+--- Test 2: Valid CSV Upload ---
+✅ PASS: Valid CSV Upload
+
+--- Test 3: Invalid JSON Upload ---
+✅ PASS: Invalid JSON Upload (expected failure)
+Expected error: Err = "JSON 파싱 실패: expected value at line 1 column 1"
+
+--- Test 4: Unsupported MIME Type ---
+✅ PASS: Unsupported MIME Type (expected failure)
+Expected error: Err = "지원하지 않는 MIME 타입: application/pdf"
+
+--- Test 5: Empty Data Upload ---
+✅ PASS: Empty Data Upload (expected failure)
+Expected error: Err = "업로드된 데이터가 비어 있습니다"
+
+--- Testing Data Duplication Detection ---
+Uploading initial data...
+First upload successful
+
+--- Test 6: Duplicate Data Detection ---
+✅ PASS: Duplicate Data Detection
+Note: Duplicate data should be handled gracefully (returning existing ID)
+
+--- Testing Storage State Queries ---
+
+--- Test 7: Storage Stats Query ---
+✅ PASS: Storage Stats Query
+
+--- Test 8: List Uploaded Data ---
+✅ PASS: List Uploaded Data
+
+--- Testing Data Retrieval ---
+
+--- Test 9: Valid Data Retrieval ---
+✅ PASS: Valid Data Retrieval
+
+--- Test 10: Invalid Data ID Retrieval ---
+✅ PASS: Invalid Data ID Retrieval
+Note: Invalid ID should return null/none, not error
+
+--- Testing Data Existence Checks ---
+
+--- Test 11: Check Existing Data ---
+✅ PASS: Check Existing Data
+
+--- Test 12: Check Non-existing Data ---
+✅ PASS: Check Non-existing Data
+
+--- Testing Minting Status Checks ---
+
+--- Test 13: Check Data Minted Status ---
+✅ PASS: Check Data Minted Status
+
+--- Test 14: Check Multiple Data Status ---
+✅ PASS: Check Multiple Data Status
+
+--- Testing Data Integrity ---
+Testing data integrity by re-uploading and comparing...
+
+--- Test 15: Data Integrity Check ---
+✅ PASS: Data Integrity Check
+
+========================================
+Upload & Validation Test Results
+========================================
+Total Tests: 15
+Passed: 15
+Failed: 0
+
+🎉 ALL TESTS PASSED!
+Success Rate: 100%
+
+Detailed Results:
+  PASS: Valid JSON Upload
+  PASS: Valid CSV Upload
+  PASS: Invalid JSON Upload (expected failure)
+  PASS: Unsupported MIME Type (expected failure)
+  PASS: Empty Data Upload (expected failure)
+  PASS: Duplicate Data Detection
+  PASS: Storage Stats Query
+  PASS: List Uploaded Data
+  PASS: Valid Data Retrieval
+  PASS: Invalid Data ID Retrieval
+  PASS: Check Existing Data
+  PASS: Check Non-existing Data
+  PASS: Check Data Minted Status
+  PASS: Check Multiple Data Status
+  PASS: Data Integrity Check
+
+Final Storage State:
+====================
+(
+  record {
+    storage_size = 104 : nat64;
+    completed_mints = 0 : nat64;
+    total_mint_requests = 1 : nat64;
+    failed_mints = 1 : nat64;
+    pending_mints = 0 : nat64;
+    total_uploads = 7 : nat64;
+  },
+)
+
+(
+  vec {
+    record {
+      id = 1 : nat64;
+      size = 11 : nat64;
+      mime_type = "application/json";
+      timestamp = 1_753_249_935_522_344_487 : nat64;
+    };
+    record {
+      id = 2 : nat64;
+      size = 10 : nat64;
+      mime_type = "text/csv";
+      timestamp = 1_753_249_936_794_990_901 : nat64;
+    };
+    record {
+      id = 3 : nat64;
+      size = 9 : nat64;
+      mime_type = "text/csv";
+      timestamp = 1_753_249_936_794_990_901 : nat64;
+    };
+    record {
+      id = 4 : nat64;
+      size = 29 : nat64;
+      mime_type = "application/json";
+      timestamp = 1_753_251_525_382_408_494 : nat64;
+    };
+    record {
+      id = 5 : nat64;
+      size = 15 : nat64;
+      mime_type = "text/csv";
+      timestamp = 1_753_251_526_667_097_714 : nat64;
+    };
+    record {
+      id = 6 : nat64;
+      size = 16 : nat64;
+      mime_type = "text/csv";
+      timestamp = 1_753_251_526_667_097_714 : nat64;
+    };
+    record {
+      id = 7 : nat64;
+      size = 14 : nat64;
+      mime_type = "text/csv";
+      timestamp = 1_753_251_526_667_097_714 : nat64;
+    };
+  },
+)
+
+=== Upload & Validation Test Completed ===

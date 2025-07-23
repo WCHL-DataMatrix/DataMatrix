@@ -23,6 +23,12 @@
       "dependencies": ["backend"],
       "type": "assets",
       "source": ["src/frontend/dist/"]
+    },
+    "worker": {
+      "main": "worker/src/lib.rs",
+      "type": "rust",
+      "candid": "worker/worker.did",
+      "package": "worker"
     }
   },
   "output_env_file": ".env",
