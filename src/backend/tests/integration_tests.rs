@@ -119,7 +119,7 @@ mod tests {
         assert!(result.is_ok(), "CSV upload failed: {:?}", result.err());
 
         let response = result.unwrap();
-        assert!(response.data.len() > 0, "No CSV data uploaded");
+        assert!(!response.data.is_empty(), "No CSV data uploaded");
 
         println!("✓ CSV records uploaded: {}", response.data.len());
         println!("✓ CSV upload & validation successful");
