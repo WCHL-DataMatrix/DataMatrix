@@ -1,7 +1,6 @@
 // tests/integration_tests.rs
-// DataMatrix Project Integration Tests (English Version)
 
-use crate::*;
+use backend::*;
 use candid::Principal;
 
 #[cfg(test)]
