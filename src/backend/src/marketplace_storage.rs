@@ -170,15 +170,13 @@ where
                 ic_cdk::println!("Listing counter re-initialized with new()");
             }
             // 방법 3: 대체 메모리
-            else {
-                if let Ok(cell) = StableCell::init(
-                    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(54))),
-                    0,
-                ) {
-                    *counter_ref = Some(cell);
-                    initialized = true;
-                    ic_cdk::println!("Listing counter initialized with alternative memory");
-                }
+            else if let Ok(cell) = StableCell::init(
+                MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(54))),
+                0,
+            ) {
+                *counter_ref = Some(cell);
+                initialized = true;
+                ic_cdk::println!("Listing counter initialized with alternative memory");
             }
 
             if !initialized {
@@ -452,7 +450,7 @@ pub fn create_listing(request: CreateListingRequest, seller: Principal) -> Resul
         ic_cdk::println!("Error accessing listing counter: {}", e);
         // 긴급 대안: 현재 시간을 기반으로 ID 생성
         let timestamp = ic_cdk::api::time();
-        (timestamp % 1_000_000) as u64
+        timestamp % 1_000_000
     });
 
     let now = ic_cdk::api::time();

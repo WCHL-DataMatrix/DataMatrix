@@ -250,15 +250,13 @@ where
                 ic_cdk::println!("Mint counter re-initialized with new()");
             }
             // 방법 3: 대체 메모리
-            else {
-                if let Ok(cell) = StableCell::init(
-                    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
-                    0,
-                ) {
-                    *counter_ref = Some(cell);
-                    initialized = true;
-                    ic_cdk::println!("Mint counter initialized with alternative memory");
-                }
+            else if let Ok(cell) = StableCell::init(
+                BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
+                0,
+            ) {
+                *counter_ref = Some(cell);
+                initialized = true;
+                ic_cdk::println!("Mint counter initialized with alternative memory");
             }
 
             if !initialized {
@@ -447,7 +445,7 @@ pub fn store_mint_request(request: MintRequest) -> u64 {
         ic_cdk::println!("Error accessing mint counter: {}", e);
         // 긴급 대안: 현재 시간을 기반으로 ID 생성
         let timestamp = ic_cdk::api::time();
-        (timestamp % 1_000_000) as u64
+        timestamp % 1_000_000
     });
 
     let request_data = MintRequestData {
