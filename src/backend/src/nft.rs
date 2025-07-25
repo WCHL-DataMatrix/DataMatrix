@@ -1,9 +1,8 @@
 // backend/src/nft.rs
 
 use crate::storage;
-use crate::types::{MintResponse, MintStatus};
+use crate::types::MintStatus;
 use candid::Principal;
-use ic_cdk::api::call::call_with_payment;
 use once_cell::sync::Lazy;
 
 // Worker canister ID
