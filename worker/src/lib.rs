@@ -44,6 +44,7 @@ pub fn mint_nft(req: MintRequest) -> Result<MintResponse, String> {
         *count += 1;
         *count
     });
+
     let info = TokenInfo {
         owner,
         cid: req.cid,

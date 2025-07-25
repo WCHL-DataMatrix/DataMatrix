@@ -33,34 +33,52 @@ fn generate_unique_id(prefix: &str, additional_data: &str) -> u64 {
     u64::from_le_bytes(id_bytes)
 }
 
-// 마켓플레이스 전용 메모리 관리자
+// 마켓플레이스 전용 메모리 관리자 (ID 50-99 사용)
 thread_local! {
     static MARKETPLACE_MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 }
 
-// 메모리 헬퍼 함수들
+// 메모리 헬퍼 함수들 - 50번대 ID 사용
 fn get_listings_memory() -> Memory {
-    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0)))
+    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(50)))
 }
 
 fn get_favorites_memory() -> Memory {
-    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
+    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(51)))
 }
 
 fn get_activity_logs_memory() -> Memory {
-    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2)))
+    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(52)))
 }
 
 fn get_listing_counter_memory() -> Memory {
-    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)))
+    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(53)))
 }
 
-// 저장소들
+// 저장소들 - RefCell<StableBTreeMap> 직접 초기화 방식 사용
 thread_local! {
-    static LISTINGS: RefCell<Option<StableBTreeMap<u64, Listing, Memory>>> = const { RefCell::new(None) };
-    static FAVORITES: RefCell<Option<StableBTreeMap<u64, Favorite, Memory>>> = const { RefCell::new(None) };
-    static ACTIVITY_LOGS: RefCell<Option<StableBTreeMap<u64, ActivityLog, Memory>>> = const { RefCell::new(None) };
+    static LISTINGS: RefCell<StableBTreeMap<u64, Listing, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(50)))
+        )
+    );
+
+    static FAVORITES: RefCell<StableBTreeMap<u64, Favorite, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(51)))
+        )
+    );
+
+    static ACTIVITY_LOGS: RefCell<StableBTreeMap<u64, ActivityLog, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(52)))
+        )
+    );
+}
+
+// 카운터는 별도로 초기화
+thread_local! {
     static LISTING_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
 }
 
@@ -69,46 +87,116 @@ thread_local! {
 // =====================
 
 pub fn init_marketplace_storage() {
-    // 판매글 저장소 초기화
-    LISTINGS.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if storage.is_none() {
-            *storage = Some(StableBTreeMap::init(get_listings_memory()));
-        }
-    });
+    ic_cdk::println!("Initializing marketplace storage...");
 
-    // 즐겨찾기 저장소 초기화
-    FAVORITES.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if storage.is_none() {
-            *storage = Some(StableBTreeMap::init(get_favorites_memory()));
-        }
-    });
-
-    // 활동 로그 저장소 초기화
-    ACTIVITY_LOGS.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if storage.is_none() {
-            *storage = Some(StableBTreeMap::init(get_activity_logs_memory()));
-        }
-    });
-
-    // 판매글 카운터 초기화
+    // 리스팅 카운터 초기화
     LISTING_COUNTER.with(|counter| {
-        let mut counter = counter.borrow_mut();
-        if counter.is_none() {
-            *counter = Some(
-                StableCell::init(get_listing_counter_memory(), 0)
-                    .expect("Failed to initialize listing counter"),
-            );
+        let mut counter_ref = counter.borrow_mut();
+        if counter_ref.is_none() {
+            // 매번 새로운 메모리 인스턴스 생성
+            match StableCell::init(get_listing_counter_memory(), 0) {
+                Ok(cell) => {
+                    *counter_ref = Some(cell);
+                    ic_cdk::println!("Listing counter initialized successfully");
+                }
+                Err(_) => {
+                    // 이미 존재하는 경우 기존 값 로드
+                    match StableCell::new(get_listing_counter_memory(), 0) {
+                        Ok(cell) => {
+                            *counter_ref = Some(cell);
+                            ic_cdk::println!("Listing counter loaded from existing memory");
+                        }
+                        Err(e) => {
+                            ic_cdk::println!("Failed to initialize listing counter: {:?}", e);
+                            // 대체 메모리 ID로 시도
+                            match StableCell::init(
+                                MARKETPLACE_MEMORY_MANAGER
+                                    .with(|m| m.borrow().get(MemoryId::new(54))),
+                                0,
+                            ) {
+                                Ok(cell) => {
+                                    *counter_ref = Some(cell);
+                                    ic_cdk::println!(
+                                        "Listing counter initialized with alternative memory ID 54"
+                                    );
+                                }
+                                Err(e2) => {
+                                    ic_cdk::println!(
+                                        "All listing counter initialization attempts failed: {:?}",
+                                        e2
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            ic_cdk::println!("Listing counter already initialized");
         }
     });
 
-    ic_cdk::println!("Marketplace storage initialized");
+    ic_cdk::println!("Marketplace storage initialization completed");
 }
 
 // =====================
-// 2) 스마트 검색 시스템
+// 2) 안전한 카운터 접근 함수
+// =====================
+
+/// 리스팅 카운터에 안전하게 접근
+fn with_listing_counter<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut StableCell<u64, Memory>) -> Result<R, String>,
+{
+    LISTING_COUNTER.with(|counter_cell| {
+        let mut counter_ref = counter_cell.borrow_mut();
+
+        if counter_ref.is_none() {
+            ic_cdk::println!("Listing counter not initialized, attempting re-initialization...");
+
+            // 여러 방법으로 시도
+            let mut initialized = false;
+
+            // 방법 1: init
+            if let Ok(cell) = StableCell::init(get_listing_counter_memory(), 0) {
+                *counter_ref = Some(cell);
+                initialized = true;
+                ic_cdk::println!("Listing counter re-initialized with init()");
+            }
+            // 방법 2: new
+            else if let Ok(cell) = StableCell::new(get_listing_counter_memory(), 0) {
+                *counter_ref = Some(cell);
+                initialized = true;
+                ic_cdk::println!("Listing counter re-initialized with new()");
+            }
+            // 방법 3: 대체 메모리
+            else {
+                if let Ok(cell) = StableCell::init(
+                    MARKETPLACE_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(54))),
+                    0,
+                ) {
+                    *counter_ref = Some(cell);
+                    initialized = true;
+                    ic_cdk::println!("Listing counter initialized with alternative memory");
+                }
+            }
+
+            if !initialized {
+                return Err("All listing counter initialization methods failed".to_string());
+            }
+        }
+
+        match counter_ref.as_mut() {
+            Some(counter) => f(counter),
+            None => {
+                Err("Listing counter still not available after initialization attempt".to_string())
+            }
+        }
+    })
+}
+
+// =====================
+// 3) 스마트 검색 시스템
 // =====================
 
 /// 검색어를 정규화하고 토큰화 (순수 Rust 구현)
@@ -274,17 +362,13 @@ fn apply_basic_filters(listing: &Listing, request: &SearchListingsRequest) -> bo
 
 /// 스마트 검색 (관련성 점수 기반)
 pub fn smart_search_listings(request: &SearchListingsRequest) -> SearchResult {
-    let all_listings: Vec<Listing> = LISTINGS.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            storage
-                .iter()
-                .map(|(_, listing)| listing)
-                .filter(|listing| listing.status != ListingStatus::Deleted)
-                .collect()
-        } else {
-            Vec::new()
-        }
+    let all_listings: Vec<Listing> = LISTINGS.with(|storage| {
+        storage
+            .borrow()
+            .iter()
+            .map(|(_, listing)| listing)
+            .filter(|listing| listing.status != ListingStatus::Deleted)
+            .collect()
     });
 
     // 1단계: 기본 필터 적용 (가격, 카테고리, 상태 등)
@@ -350,25 +434,26 @@ pub fn smart_search_listings(request: &SearchListingsRequest) -> SearchResult {
 }
 
 // =====================
-// 2) 판매글 관리
+// 4) 판매글 관리
 // =====================
 
 /// 판매글 생성
 pub fn create_listing(request: CreateListingRequest, seller: Principal) -> Result<u64, String> {
     // 판매글 ID 생성
-    let listing_id = LISTING_COUNTER.with(|counter_cell| {
-        let mut counter_ref = counter_cell.borrow_mut();
-        if let Some(counter) = counter_ref.as_mut() {
-            let current = counter.get();
-            let next_id = current + 1;
-            counter
-                .set(next_id)
-                .map_err(|e| format!("카운터 업데이트 실패: {:?}", e))?;
-            Ok(next_id)
-        } else {
-            Err("Listing counter not initialized".to_string())
-        }
-    })?;
+    let listing_id = with_listing_counter(|counter| {
+        let current = *counter.get();
+        let next_id = current + 1;
+        counter
+            .set(next_id)
+            .map_err(|e| format!("카운터 업데이트 실패: {:?}", e))?;
+        Ok(next_id)
+    })
+    .unwrap_or_else(|e| {
+        ic_cdk::println!("Error accessing listing counter: {}", e);
+        // 긴급 대안: 현재 시간을 기반으로 ID 생성
+        let timestamp = ic_cdk::api::time();
+        (timestamp % 1_000_000) as u64
+    });
 
     let now = ic_cdk::api::time();
     let listing = Listing {
@@ -390,15 +475,9 @@ pub fn create_listing(request: CreateListingRequest, seller: Principal) -> Resul
     };
 
     // 판매글 저장
-    LISTINGS.with(|storage_cell| {
-        let mut storage_ref = storage_cell.borrow_mut();
-        if let Some(storage) = storage_ref.as_mut() {
-            storage.insert(listing_id, listing);
-            Ok(())
-        } else {
-            Err("Listings storage not initialized".to_string())
-        }
-    })?;
+    LISTINGS.with(|storage| {
+        storage.borrow_mut().insert(listing_id, listing);
+    });
 
     // 활동 로그 기록
     log_activity(
@@ -413,10 +492,7 @@ pub fn create_listing(request: CreateListingRequest, seller: Principal) -> Resul
 
 /// 판매글 조회 (조회수 증가)
 pub fn get_listing(listing_id: u64) -> Option<Listing> {
-    let mut listing = LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        storage.as_ref()?.get(&listing_id)
-    })?;
+    let mut listing = LISTINGS.with(|storage| storage.borrow().get(&listing_id))?;
 
     // 조회수 증가
     listing.view_count += 1;
@@ -424,10 +500,7 @@ pub fn get_listing(listing_id: u64) -> Option<Listing> {
 
     // 업데이트된 정보 저장
     LISTINGS.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if let Some(ref mut storage) = storage.as_mut() {
-            storage.insert(listing_id, listing.clone());
-        }
+        storage.borrow_mut().insert(listing_id, listing.clone());
     });
 
     Some(listing)
@@ -435,23 +508,16 @@ pub fn get_listing(listing_id: u64) -> Option<Listing> {
 
 /// 판매글 조회 (조회수 증가 없음)
 pub fn get_listing_readonly(listing_id: u64) -> Option<Listing> {
-    LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        storage.as_ref()?.get(&listing_id)
-    })
+    LISTINGS.with(|storage| storage.borrow().get(&listing_id))
 }
 
 /// 판매글 업데이트
 pub fn update_listing(request: UpdateListingRequest, user: Principal) -> Result<(), String> {
-    let mut listing = LISTINGS.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            storage
-                .get(&request.listing_id)
-                .ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())
-        } else {
-            Err("Listings storage not initialized".to_string())
-        }
+    let mut listing = LISTINGS.with(|storage| {
+        storage
+            .borrow()
+            .get(&request.listing_id)
+            .ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())
     })?;
 
     // 권한 확인
@@ -488,15 +554,9 @@ pub fn update_listing(request: UpdateListingRequest, user: Principal) -> Result<
     listing.updated_at = ic_cdk::api::time();
 
     // 저장
-    LISTINGS.with(|storage_cell| {
-        let mut storage_ref = storage_cell.borrow_mut();
-        if let Some(storage) = storage_ref.as_mut() {
-            storage.insert(request.listing_id, listing);
-            Ok(())
-        } else {
-            Err("Listings storage not initialized".to_string())
-        }
-    })?;
+    LISTINGS.with(|storage| {
+        storage.borrow_mut().insert(request.listing_id, listing);
+    });
 
     // 활동 로그 기록
     log_activity(
@@ -511,15 +571,11 @@ pub fn update_listing(request: UpdateListingRequest, user: Principal) -> Result<
 
 /// 판매글 삭제
 pub fn delete_listing(listing_id: u64, user: Principal) -> Result<(), String> {
-    let listing = LISTINGS.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            storage
-                .get(&listing_id)
-                .ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())
-        } else {
-            Err("Listings storage not initialized".to_string())
-        }
+    let listing = LISTINGS.with(|storage| {
+        storage
+            .borrow()
+            .get(&listing_id)
+            .ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())
     })?;
 
     // 권한 확인
@@ -532,15 +588,9 @@ pub fn delete_listing(listing_id: u64, user: Principal) -> Result<(), String> {
     updated_listing.status = ListingStatus::Deleted;
     updated_listing.updated_at = ic_cdk::api::time();
 
-    LISTINGS.with(|storage_cell| {
-        let mut storage_ref = storage_cell.borrow_mut();
-        if let Some(storage) = storage_ref.as_mut() {
-            storage.insert(listing_id, updated_listing);
-            Ok(())
-        } else {
-            Err("Listings storage not initialized".to_string())
-        }
-    })?;
+    LISTINGS.with(|storage| {
+        storage.borrow_mut().insert(listing_id, updated_listing);
+    });
 
     // 활동 로그 기록
     log_activity(
@@ -556,68 +606,56 @@ pub fn delete_listing(listing_id: u64, user: Principal) -> Result<(), String> {
 /// 판매글 목록 조회 (기본)
 pub fn list_listings(status: Option<ListingStatus>, limit: Option<u64>) -> Vec<ListingSummary> {
     LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => {
-                let mut listings: Vec<_> = storage
-                    .iter()
-                    .filter(|(_, listing)| {
-                        if let Some(ref status) = status {
-                            &listing.status == status
-                        } else {
-                            listing.status != ListingStatus::Deleted
-                        }
-                    })
-                    .map(|(_, listing)| to_listing_summary(listing))
-                    .collect();
-
-                // 최신순 정렬
-                listings.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-                // 제한 적용
-                if let Some(limit) = limit {
-                    listings.truncate(limit as usize);
+        let mut listings: Vec<_> = storage
+            .borrow()
+            .iter()
+            .filter(|(_, listing)| {
+                if let Some(ref status) = status {
+                    &listing.status == status
+                } else {
+                    listing.status != ListingStatus::Deleted
                 }
+            })
+            .map(|(_, listing)| to_listing_summary(listing))
+            .collect();
 
-                listings
-            }
-            None => Vec::new(),
+        // 최신순 정렬
+        listings.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+        // 제한 적용
+        if let Some(limit) = limit {
+            listings.truncate(limit as usize);
         }
+
+        listings
     })
 }
 
 /// 판매자별 판매글 조회
 pub fn get_listings_by_seller(seller: Principal) -> Vec<ListingSummary> {
     LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => {
-                let mut listings: Vec<_> = storage
-                    .iter()
-                    .filter(|(_, listing)| {
-                        listing.seller == seller && listing.status != ListingStatus::Deleted
-                    })
-                    .map(|(_, listing)| to_listing_summary(listing))
-                    .collect();
+        let mut listings: Vec<_> = storage
+            .borrow()
+            .iter()
+            .filter(|(_, listing)| {
+                listing.seller == seller && listing.status != ListingStatus::Deleted
+            })
+            .map(|(_, listing)| to_listing_summary(listing))
+            .collect();
 
-                listings.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-                listings
-            }
-            None => Vec::new(),
-        }
+        listings.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        listings
     })
 }
 
 // =====================
-// 3) 기존 검색 함수 (스마트 검색으로 교체)
+// 5) 검색 함수 (스마트 검색으로 교체)
 // =====================
 
 /// 판매글 검색 (개선된 스마트 검색 사용)
 pub fn search_listings(request: &SearchListingsRequest) -> SearchResult {
     smart_search_listings(request)
 }
-
-// 기존 apply_filters 함수는 apply_basic_filters로 대체됨
 
 fn sort_listings(listings: &mut Vec<Listing>, sort_by: &SortBy) {
     match sort_by {
@@ -646,7 +684,7 @@ fn sort_listings(listings: &mut Vec<Listing>, sort_by: &SortBy) {
 }
 
 // =====================
-// 4) 자동완성 및 제안 기능
+// 6) 자동완성 및 제안 기능
 // =====================
 
 /// 검색어 자동완성 제안
@@ -654,30 +692,27 @@ pub fn get_search_suggestions(partial_query: &str, limit: usize) -> Vec<String> 
     let query_lower = partial_query.to_lowercase();
     let mut suggestions = HashSet::new();
 
-    LISTINGS.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            for (_, listing) in storage.iter() {
-                if listing.status == ListingStatus::Active {
-                    // 제목에서 제안
-                    let title_words = tokenize_query(&listing.title);
-                    for word in title_words {
-                        if word.starts_with(&query_lower) && word.len() > partial_query.len() {
-                            suggestions.insert(word);
-                        }
+    LISTINGS.with(|storage| {
+        for (_, listing) in storage.borrow().iter() {
+            if listing.status == ListingStatus::Active {
+                // 제목에서 제안
+                let title_words = tokenize_query(&listing.title);
+                for word in title_words {
+                    if word.starts_with(&query_lower) && word.len() > partial_query.len() {
+                        suggestions.insert(word);
                     }
+                }
 
-                    // 태그에서 제안
-                    for tag in &listing.tags {
-                        if tag.to_lowercase().starts_with(&query_lower) {
-                            suggestions.insert(tag.clone());
-                        }
+                // 태그에서 제안
+                for tag in &listing.tags {
+                    if tag.to_lowercase().starts_with(&query_lower) {
+                        suggestions.insert(tag.clone());
                     }
+                }
 
-                    // 카테고리에서 제안
-                    if listing.category.to_lowercase().starts_with(&query_lower) {
-                        suggestions.insert(listing.category.clone());
-                    }
+                // 카테고리에서 제안
+                if listing.category.to_lowercase().starts_with(&query_lower) {
+                    suggestions.insert(listing.category.clone());
                 }
             }
         }
@@ -693,25 +728,22 @@ pub fn get_search_suggestions(partial_query: &str, limit: usize) -> Vec<String> 
 pub fn get_trending_keywords(limit: usize) -> Vec<(String, u32)> {
     let mut keyword_counts: HashMap<String, u32> = HashMap::new();
 
-    LISTINGS.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            for (_, listing) in storage.iter() {
-                if listing.status == ListingStatus::Active {
-                    // 제목에서 키워드 추출
-                    let title_keywords = extract_keywords(&listing.title);
-                    for keyword in title_keywords {
-                        if keyword.len() >= 2 {
-                            let count = keyword_counts.entry(keyword).or_insert(0);
-                            *count += listing.view_count as u32;
-                        }
+    LISTINGS.with(|storage| {
+        for (_, listing) in storage.borrow().iter() {
+            if listing.status == ListingStatus::Active {
+                // 제목에서 키워드 추출
+                let title_keywords = extract_keywords(&listing.title);
+                for keyword in title_keywords {
+                    if keyword.len() >= 2 {
+                        let count = keyword_counts.entry(keyword).or_insert(0);
+                        *count += listing.view_count as u32;
                     }
+                }
 
-                    // 태그에서 키워드 추출
-                    for tag in &listing.tags {
-                        let count = keyword_counts.entry(tag.clone()).or_insert(0);
-                        *count += (listing.view_count + listing.favorite_count) as u32;
-                    }
+                // 태그에서 키워드 추출
+                for tag in &listing.tags {
+                    let count = keyword_counts.entry(tag.clone()).or_insert(0);
+                    *count += (listing.view_count + listing.favorite_count) as u32;
                 }
             }
         }
@@ -724,39 +756,25 @@ pub fn get_trending_keywords(limit: usize) -> Vec<(String, u32)> {
 }
 
 // =====================
-// 5) 검색 통계 및 분석 (타입은 marketplace_types.rs에 정의됨)
-// =====================
-
-/// 검색 결과에 대한 통계 계산은 marketplace.rs에서 처리
-
-// =====================
-// 4) 즐겨찾기 관리
+// 7) 즐겨찾기 관리
 // =====================
 
 /// 즐겨찾기 추가
 pub fn add_favorite(user: Principal, listing_id: u64) -> Result<(), String> {
     // 판매글 존재 확인
-    let mut listing = LISTINGS.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            storage
-                .get(&listing_id)
-                .ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())
-        } else {
-            Err("Listings storage not initialized".to_string())
-        }
+    let mut listing = LISTINGS.with(|storage| {
+        storage
+            .borrow()
+            .get(&listing_id)
+            .ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())
     })?;
 
     // 이미 즐겨찾기에 추가되어 있는지 확인
-    let already_favorited = FAVORITES.with(|storage_cell| {
-        let storage_ref = storage_cell.borrow();
-        if let Some(storage) = storage_ref.as_ref() {
-            storage
-                .iter()
-                .any(|(_, fav)| fav.user == user && fav.listing_id == listing_id)
-        } else {
-            false
-        }
+    let already_favorited = FAVORITES.with(|storage| {
+        storage
+            .borrow()
+            .iter()
+            .any(|(_, fav)| fav.user == user && fav.listing_id == listing_id)
     });
 
     if already_favorited {
@@ -773,25 +791,16 @@ pub fn add_favorite(user: Principal, listing_id: u64) -> Result<(), String> {
     };
 
     // 즐겨찾기 저장
-    FAVORITES.with(|storage_cell| {
-        let mut storage_ref = storage_cell.borrow_mut();
-        if let Some(storage) = storage_ref.as_mut() {
-            storage.insert(favorite_id, favorite);
-            Ok(())
-        } else {
-            Err("Favorites storage not initialized".to_string())
-        }
-    })?;
+    FAVORITES.with(|storage| {
+        storage.borrow_mut().insert(favorite_id, favorite);
+    });
 
     // 판매글의 즐겨찾기 수 증가
     listing.favorite_count += 1;
     listing.updated_at = ic_cdk::api::time();
 
-    LISTINGS.with(|storage_cell| {
-        let mut storage_ref = storage_cell.borrow_mut();
-        if let Some(storage) = storage_ref.as_mut() {
-            storage.insert(listing_id, listing);
-        }
+    LISTINGS.with(|storage| {
+        storage.borrow_mut().insert(listing_id, listing);
     });
 
     // 활동 로그 기록
@@ -811,41 +820,27 @@ pub fn remove_favorite(user: Principal, listing_id: u64) -> Result<(), String> {
     let favorite_id = FAVORITES
         .with(|storage| {
             let storage = storage.borrow();
-            match storage.as_ref() {
-                Some(storage) => {
-                    for (id, fav) in storage.iter() {
-                        if fav.user == user && fav.listing_id == listing_id {
-                            return Some(id);
-                        }
-                    }
-                    None
+            for (id, fav) in storage.iter() {
+                if fav.user == user && fav.listing_id == listing_id {
+                    return Some(id);
                 }
-                None => None,
             }
+            None
         })
         .ok_or_else(|| "즐겨찾기를 찾을 수 없습니다".to_string())?;
 
     // 즐겨찾기 삭제
     FAVORITES.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if let Some(ref mut storage) = storage.as_mut() {
-            storage.remove(&favorite_id);
-        }
+        storage.borrow_mut().remove(&favorite_id);
     });
 
     // 판매글의 즐겨찾기 수 감소
-    if let Some(mut listing) = LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        storage.as_ref().and_then(|s| s.get(&listing_id))
-    }) {
+    if let Some(mut listing) = LISTINGS.with(|storage| storage.borrow().get(&listing_id)) {
         listing.favorite_count = listing.favorite_count.saturating_sub(1);
         listing.updated_at = ic_cdk::api::time();
 
         LISTINGS.with(|storage| {
-            let mut storage = storage.borrow_mut();
-            if let Some(ref mut storage) = storage.as_mut() {
-                storage.insert(listing_id, listing);
-            }
+            storage.borrow_mut().insert(listing_id, listing);
         });
     }
 
@@ -855,46 +850,36 @@ pub fn remove_favorite(user: Principal, listing_id: u64) -> Result<(), String> {
 /// 사용자의 즐겨찾기 목록 조회
 pub fn get_user_favorites(user: Principal) -> Vec<ListingSummary> {
     let favorite_listing_ids: Vec<u64> = FAVORITES.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => storage
-                .iter()
-                .filter(|(_, fav)| fav.user == user)
-                .map(|(_, fav)| fav.listing_id)
-                .collect(),
-            None => Vec::new(),
-        }
+        storage
+            .borrow()
+            .iter()
+            .filter(|(_, fav)| fav.user == user)
+            .map(|(_, fav)| fav.listing_id)
+            .collect()
     });
 
     LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => favorite_listing_ids
-                .into_iter()
-                .filter_map(|id| storage.get(&id))
-                .filter(|listing| listing.status != ListingStatus::Deleted)
-                .map(to_listing_summary)
-                .collect(),
-            None => Vec::new(),
-        }
+        favorite_listing_ids
+            .into_iter()
+            .filter_map(|id| storage.borrow().get(&id))
+            .filter(|listing| listing.status != ListingStatus::Deleted)
+            .map(to_listing_summary)
+            .collect()
     })
 }
 
 /// 즐겨찾기 여부 확인
 pub fn is_favorited(user: Principal, listing_id: u64) -> bool {
     FAVORITES.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => storage
-                .iter()
-                .any(|(_, fav)| fav.user == user && fav.listing_id == listing_id),
-            None => false,
-        }
+        storage
+            .borrow()
+            .iter()
+            .any(|(_, fav)| fav.user == user && fav.listing_id == listing_id)
     })
 }
 
 // =====================
-// 5) 활동 로그 관리
+// 8) 활동 로그 관리
 // =====================
 
 /// 활동 로그 기록
@@ -922,110 +907,90 @@ pub fn log_activity(
         details,
     };
 
-    ACTIVITY_LOGS.with(|storage_cell| {
-        let mut storage_ref = storage_cell.borrow_mut();
-        if let Some(storage) = storage_ref.as_mut() {
-            storage.insert(activity_id, activity);
-        }
+    ACTIVITY_LOGS.with(|storage| {
+        storage.borrow_mut().insert(activity_id, activity);
     });
 }
 
 /// 최근 활동 로그 조회
 pub fn get_recent_activities(limit: u64) -> Vec<ActivityLog> {
     ACTIVITY_LOGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => {
-                let mut activities: Vec<_> = storage.iter().map(|(_, activity)| activity).collect();
-                activities.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-                activities.truncate(limit as usize);
-                activities
-            }
-            None => Vec::new(),
-        }
+        let mut activities: Vec<_> = storage
+            .borrow()
+            .iter()
+            .map(|(_, activity)| activity)
+            .collect();
+        activities.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        activities.truncate(limit as usize);
+        activities
     })
 }
 
 // =====================
-// 6) 통계 정보
+// 9) 통계 정보
 // =====================
 
 /// 마켓플레이스 통계 조회
 pub fn get_marketplace_stats() -> MarketplaceStats {
     LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => {
-                let mut total_listings = 0u64;
-                let mut active_listings = 0u64;
-                let mut sold_listings = 0u64;
-                let mut total_views = 0u64;
-                let mut total_favorites = 0u64;
-                let mut sellers = std::collections::HashSet::new();
-                let mut categories = std::collections::HashMap::new();
+        let mut total_listings = 0u64;
+        let mut active_listings = 0u64;
+        let mut sold_listings = 0u64;
+        let mut total_views = 0u64;
+        let mut total_favorites = 0u64;
+        let mut sellers = std::collections::HashSet::new();
+        let mut categories = std::collections::HashMap::new();
 
-                for (_, listing) in storage.iter() {
-                    if listing.status == ListingStatus::Deleted {
-                        continue;
-                    }
-
-                    total_listings += 1;
-                    total_views += listing.view_count;
-                    total_favorites += listing.favorite_count;
-                    sellers.insert(listing.seller);
-
-                    match listing.status {
-                        ListingStatus::Active => active_listings += 1,
-                        ListingStatus::Sold => sold_listings += 1,
-                        _ => {}
-                    }
-
-                    // 카테고리별 통계
-                    let category_stat = categories
-                        .entry(listing.category.clone())
-                        .or_insert((0u64, 0u64, 0u64));
-                    category_stat.0 += 1; // count
-                    category_stat.1 += listing.price; // total price
-                }
-
-                let category_stats: Vec<CategoryStats> = categories
-                    .into_iter()
-                    .map(|(category, (count, total_price, _))| CategoryStats {
-                        category,
-                        count,
-                        avg_price: if count > 0 { total_price / count } else { 0 },
-                    })
-                    .collect();
-
-                let recent_activity = get_recent_activities(10);
-
-                MarketplaceStats {
-                    total_listings,
-                    active_listings,
-                    sold_listings,
-                    total_sellers: sellers.len() as u64,
-                    total_views,
-                    total_favorites,
-                    categories: category_stats,
-                    recent_activity,
-                }
+        for (_, listing) in storage.borrow().iter() {
+            if listing.status == ListingStatus::Deleted {
+                continue;
             }
-            None => MarketplaceStats {
-                total_listings: 0,
-                active_listings: 0,
-                sold_listings: 0,
-                total_sellers: 0,
-                total_views: 0,
-                total_favorites: 0,
-                categories: Vec::new(),
-                recent_activity: Vec::new(),
-            },
+
+            total_listings += 1;
+            total_views += listing.view_count;
+            total_favorites += listing.favorite_count;
+            sellers.insert(listing.seller);
+
+            match listing.status {
+                ListingStatus::Active => active_listings += 1,
+                ListingStatus::Sold => sold_listings += 1,
+                _ => {}
+            }
+
+            // 카테고리별 통계
+            let category_stat = categories
+                .entry(listing.category.clone())
+                .or_insert((0u64, 0u64, 0u64));
+            category_stat.0 += 1; // count
+            category_stat.1 += listing.price; // total price
+        }
+
+        let category_stats: Vec<CategoryStats> = categories
+            .into_iter()
+            .map(|(category, (count, total_price, _))| CategoryStats {
+                category,
+                count,
+                avg_price: if count > 0 { total_price / count } else { 0 },
+            })
+            .collect();
+
+        let recent_activity = get_recent_activities(10);
+
+        MarketplaceStats {
+            total_listings,
+            active_listings,
+            sold_listings,
+            total_sellers: sellers.len() as u64,
+            total_views,
+            total_favorites,
+            categories: category_stats,
+            recent_activity,
         }
     })
 }
 
 // =====================
-// 7) 헬퍼 함수들
+// 10) 헬퍼 함수들
 // =====================
 
 /// Listing을 ListingSummary로 변환
@@ -1069,48 +1034,36 @@ pub fn get_listing_detail(listing_id: u64) -> Option<ListingDetail> {
 /// 카테고리별 판매글 수 조회
 pub fn get_listings_count_by_category() -> Vec<(String, u64)> {
     LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => {
-                let mut categories = std::collections::HashMap::new();
+        let mut categories = std::collections::HashMap::new();
 
-                for (_, listing) in storage.iter() {
-                    if listing.status == ListingStatus::Active {
-                        *categories.entry(listing.category.clone()).or_insert(0) += 1;
-                    }
-                }
-
-                let mut result: Vec<_> = categories.into_iter().collect();
-                result.sort_by(|a, b| b.1.cmp(&a.1)); // 개수별 내림차순 정렬
-                result
+        for (_, listing) in storage.borrow().iter() {
+            if listing.status == ListingStatus::Active {
+                *categories.entry(listing.category.clone()).or_insert(0) += 1;
             }
-            None => Vec::new(),
         }
+
+        let mut result: Vec<_> = categories.into_iter().collect();
+        result.sort_by(|a, b| b.1.cmp(&a.1)); // 개수별 내림차순 정렬
+        result
     })
 }
 
 /// 인기 태그 조회
 pub fn get_popular_tags(limit: u64) -> Vec<(String, u64)> {
     LISTINGS.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => {
-                let mut tags = std::collections::HashMap::new();
+        let mut tags = std::collections::HashMap::new();
 
-                for (_, listing) in storage.iter() {
-                    if listing.status == ListingStatus::Active {
-                        for tag in &listing.tags {
-                            *tags.entry(tag.clone()).or_insert(0) += 1;
-                        }
-                    }
+        for (_, listing) in storage.borrow().iter() {
+            if listing.status == ListingStatus::Active {
+                for tag in &listing.tags {
+                    *tags.entry(tag.clone()).or_insert(0) += 1;
                 }
-
-                let mut result: Vec<_> = tags.into_iter().collect();
-                result.sort_by(|a, b| b.1.cmp(&a.1)); // 사용횟수별 내림차순 정렬
-                result.truncate(limit as usize);
-                result
             }
-            None => Vec::new(),
         }
+
+        let mut result: Vec<_> = tags.into_iter().collect();
+        result.sort_by(|a, b| b.1.cmp(&a.1)); // 사용횟수별 내림차순 정렬
+        result.truncate(limit as usize);
+        result
     })
 }

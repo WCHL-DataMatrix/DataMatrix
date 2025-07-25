@@ -12,39 +12,39 @@ use std::cell::RefCell;
 // 메모리 관리
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
-// 전역 메모리 관리자
+// BACKEND 전용 메모리 관리자 (wallet과 완전 분리)
 thread_local! {
-    static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
+    static BACKEND_MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
 }
 
-// 저장소 초기화를 위한 헬퍼 함수들
+// Backend 전용 메모리 ID들 (0-9는 backend용)
 fn get_uploaded_data_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0)))
 }
 
 fn get_mint_requests_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
 }
 
 fn get_mint_status_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2)))
 }
 
 fn get_upload_counter_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3)))
 }
 
 fn get_mint_counter_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))
 }
 
 fn get_data_hashes_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)))
 }
 
 fn get_minted_hashes_memory() -> Memory {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6)))
+    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6)))
 }
 
 // 데이터 해시를 위한 타입
@@ -69,18 +69,43 @@ impl ic_stable_structures::Storable for DataHash {
         };
 }
 
-// 저장소
+// 저장소들 - RefCell<StableBTreeMap> 직접 초기화 방식 사용
 thread_local! {
-    static UPLOADED_DATA: RefCell<Option<StableBTreeMap<u64, DataBlob, Memory>>> = const { RefCell::new(None) };
-    static MINT_REQUESTS: RefCell<Option<StableBTreeMap<u64, MintRequestData, Memory>>> = const { RefCell::new(None) };
-    static MINT_STATUS_MAP: RefCell<Option<StableBTreeMap<u64, MintStatus, Memory>>> = const { RefCell::new(None) };
+    static UPLOADED_DATA: RefCell<StableBTreeMap<u64, DataBlob, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0)))
+        )
+    );
+
+    static MINT_REQUESTS: RefCell<StableBTreeMap<u64, MintRequestData, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1)))
+        )
+    );
+
+    static MINT_STATUS_MAP: RefCell<StableBTreeMap<u64, MintStatus, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2)))
+        )
+    );
+
+    static DATA_HASHES: RefCell<StableBTreeMap<DataHash, u64, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5)))
+        )
+    );
+
+    static MINTED_HASHES: RefCell<StableBTreeMap<DataHash, u64, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6)))
+        )
+    );
+}
+
+// 카운터들은 별도로 초기화
+thread_local! {
     static UPLOAD_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
     static MINT_COUNTER: RefCell<Option<StableCell<u64, Memory>>> = const { RefCell::new(None) };
-
-    // 새로 추가: 데이터 해시 -> 데이터 ID 매핑
-    static DATA_HASHES: RefCell<Option<StableBTreeMap<DataHash, u64, Memory>>> = const { RefCell::new(None) };
-    // 새로 추가: 민팅된 데이터 해시 집합
-    static MINTED_HASHES: RefCell<Option<StableBTreeMap<DataHash, u64, Memory>>> = const { RefCell::new(None) };
 }
 
 // =====================
@@ -88,73 +113,170 @@ thread_local! {
 // =====================
 
 pub fn init_storage() {
-    // 업로드 데이터 저장소 초기화
-    UPLOADED_DATA.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if storage.is_none() {
-            *storage = Some(StableBTreeMap::init(get_uploaded_data_memory()));
-        }
-    });
-
-    // 민팅 요청 저장소 초기화
-    MINT_REQUESTS.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if storage.is_none() {
-            *storage = Some(StableBTreeMap::init(get_mint_requests_memory()));
-        }
-    });
-
-    // 민팅 상태 저장소 초기화
-    MINT_STATUS_MAP.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        if storage.is_none() {
-            *storage = Some(StableBTreeMap::init(get_mint_status_memory()));
-        }
-    });
+    ic_cdk::println!("Initializing backend storage...");
 
     // 업로드 카운터 초기화
     UPLOAD_COUNTER.with(|counter| {
-        let mut counter = counter.borrow_mut();
-        if counter.is_none() {
-            *counter = Some(
-                StableCell::init(get_upload_counter_memory(), 0)
-                    .expect("Failed to initialize upload counter"),
-            );
+        let mut counter_ref = counter.borrow_mut();
+        if counter_ref.is_none() {
+            // 매번 새로운 메모리 인스턴스 생성
+            match StableCell::init(get_upload_counter_memory(), 0) {
+                Ok(cell) => {
+                    *counter_ref = Some(cell);
+                    ic_cdk::println!("Upload counter initialized successfully");
+                }
+                Err(_) => {
+                    // 이미 존재하는 경우 기존 값 로드
+                    match StableCell::new(get_upload_counter_memory(), 0) {
+                        Ok(cell) => {
+                            *counter_ref = Some(cell);
+                            ic_cdk::println!("Upload counter loaded from existing memory");
+                        }
+                        Err(e) => {
+                            ic_cdk::println!("Failed to initialize upload counter: {:?}", e);
+                        }
+                    }
+                }
+            }
         }
     });
 
-    // 민팅 카운터 초기화
+    // 민팅 카운터 초기화 - 컴파일 에러 수정
     MINT_COUNTER.with(|counter| {
-        let mut counter = counter.borrow_mut();
-        if counter.is_none() {
-            *counter = Some(
-                StableCell::init(get_mint_counter_memory(), 0)
-                    .expect("Failed to initialize mint counter"),
-            );
+        let mut counter_ref = counter.borrow_mut();
+        if counter_ref.is_none() {
+            // 매번 새로운 메모리 인스턴스 생성하여 소유권 문제 해결
+            match StableCell::init(get_mint_counter_memory(), 0) {
+                Ok(cell) => {
+                    *counter_ref = Some(cell);
+                    ic_cdk::println!("Mint counter initialized successfully with init()");
+                }
+                Err(_) => {
+                    // init 실패시 new로 기존 값 로드 시도
+                    match StableCell::new(get_mint_counter_memory(), 0) {
+                        Ok(cell) => {
+                            *counter_ref = Some(cell);
+                            ic_cdk::println!("Mint counter loaded from existing memory with new()");
+                        }
+                        Err(e) => {
+                            ic_cdk::println!("Mint counter both init and new failed: {:?}", e);
+
+                            // 최후의 수단: 다른 메모리 ID로 시도
+                            match StableCell::init(
+                                BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
+                                0,
+                            ) {
+                                Ok(cell) => {
+                                    *counter_ref = Some(cell);
+                                    ic_cdk::println!(
+                                        "Mint counter initialized with alternative memory ID 7"
+                                    );
+                                }
+                                Err(e2) => {
+                                    ic_cdk::println!(
+                                        "All mint counter initialization attempts failed: {:?}",
+                                        e2
+                                    );
+                                    // 패닉 대신 경고 로그만 출력
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            ic_cdk::println!("Mint counter already initialized");
         }
     });
 
-    // 데이터 해시 저장소 초기화
-    DATA_HASHES.with(|hashes| {
-        let mut hashes = hashes.borrow_mut();
-        if hashes.is_none() {
-            *hashes = Some(StableBTreeMap::init(get_data_hashes_memory()));
-        }
-    });
-
-    // 민팅된 해시 저장소 초기화
-    MINTED_HASHES.with(|hashes| {
-        let mut hashes = hashes.borrow_mut();
-        if hashes.is_none() {
-            *hashes = Some(StableBTreeMap::init(get_minted_hashes_memory()));
-        }
-    });
-
-    ic_cdk::println!("Storage initialized");
+    ic_cdk::println!("Backend storage initialization completed");
 }
 
 // =====================
-// 2) 해시 관련 함수
+// 2) 안전한 카운터 접근 함수들 - 컴파일 에러 수정
+// =====================
+
+/// 업로드 카운터에 안전하게 접근
+fn with_upload_counter<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut StableCell<u64, Memory>) -> Result<R, String>,
+{
+    UPLOAD_COUNTER.with(|counter_cell| {
+        let mut counter_ref = counter_cell.borrow_mut();
+
+        if counter_ref.is_none() {
+            ic_cdk::println!("Upload counter not initialized, attempting initialization...");
+
+            match StableCell::init(get_upload_counter_memory(), 0) {
+                Ok(cell) => *counter_ref = Some(cell),
+                Err(_) => match StableCell::new(get_upload_counter_memory(), 0) {
+                    Ok(cell) => *counter_ref = Some(cell),
+                    Err(e) => return Err(format!("Failed to initialize upload counter: {:?}", e)),
+                },
+            }
+        }
+
+        match counter_ref.as_mut() {
+            Some(counter) => f(counter),
+            None => Err("Upload counter still not available".to_string()),
+        }
+    })
+}
+
+/// 민팅 카운터에 안전하게 접근
+fn with_mint_counter<F, R>(f: F) -> Result<R, String>
+where
+    F: FnOnce(&mut StableCell<u64, Memory>) -> Result<R, String>,
+{
+    MINT_COUNTER.with(|counter_cell| {
+        let mut counter_ref = counter_cell.borrow_mut();
+
+        if counter_ref.is_none() {
+            ic_cdk::println!("Mint counter not initialized, attempting re-initialization...");
+
+            // 여러 방법으로 시도
+            let mut initialized = false;
+
+            // 방법 1: init
+            if let Ok(cell) = StableCell::init(get_mint_counter_memory(), 0) {
+                *counter_ref = Some(cell);
+                initialized = true;
+                ic_cdk::println!("Mint counter re-initialized with init()");
+            }
+            // 방법 2: new
+            else if let Ok(cell) = StableCell::new(get_mint_counter_memory(), 0) {
+                *counter_ref = Some(cell);
+                initialized = true;
+                ic_cdk::println!("Mint counter re-initialized with new()");
+            }
+            // 방법 3: 대체 메모리
+            else {
+                if let Ok(cell) = StableCell::init(
+                    BACKEND_MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
+                    0,
+                ) {
+                    *counter_ref = Some(cell);
+                    initialized = true;
+                    ic_cdk::println!("Mint counter initialized with alternative memory");
+                }
+            }
+
+            if !initialized {
+                return Err("All mint counter initialization methods failed".to_string());
+            }
+        }
+
+        match counter_ref.as_mut() {
+            Some(counter) => f(counter),
+            None => {
+                Err("Mint counter still not available after initialization attempt".to_string())
+            }
+        }
+    })
+}
+
+// =====================
+// 3) 해시 관련 함수
 // =====================
 
 /// 데이터의 해시 계산
@@ -170,21 +292,13 @@ fn calculate_data_hash(data: &[u8]) -> DataHash {
 /// 업로드된 데이터와 중복 검사
 pub fn check_data_exists(data: &[u8]) -> Option<u64> {
     let hash = calculate_data_hash(data);
-
-    DATA_HASHES.with(|hashes| {
-        let hashes = hashes.borrow();
-        hashes.as_ref()?.get(&hash)
-    })
+    DATA_HASHES.with(|hashes| hashes.borrow().get(&hash))
 }
 
 /// 이미 민팅된 데이터인지 검사
 pub fn check_data_minted(data: &[u8]) -> bool {
     let hash = calculate_data_hash(data);
-
-    MINTED_HASHES.with(|hashes| {
-        let hashes = hashes.borrow();
-        hashes.as_ref().map_or(false, |h| h.contains_key(&hash))
-    })
+    MINTED_HASHES.with(|hashes| hashes.borrow().contains_key(&hash))
 }
 
 /// 여러 데이터의 중복 검사 (업로드 및 민팅 여부)
@@ -200,7 +314,7 @@ pub fn check_multiple_data_status(data_list: &[Vec<u8>]) -> Vec<(Option<u64>, bo
 }
 
 // =====================
-// 3) 업로드 데이터 관리
+// 4) 업로드 데이터 관리
 // =====================
 
 /// 업로드 데이터 저장 (중복 검사 포함)
@@ -215,15 +329,9 @@ pub fn store_upload_data(parsed_data: Vec<CborValue>, mime_type: &str) -> Result
         let hash = calculate_data_hash(&bytes);
 
         // 이미 존재하는 데이터인지 확인
-        if let Some(existing_id) = DATA_HASHES.with(|hashes| {
-            let hashes = hashes.borrow();
-            hashes.as_ref().and_then(|h| h.get(&hash))
-        }) {
+        if let Some(existing_id) = DATA_HASHES.with(|hashes| hashes.borrow().get(&hash)) {
             // 이미 민팅되었는지 확인
-            if MINTED_HASHES.with(|hashes| {
-                let hashes = hashes.borrow();
-                hashes.as_ref().map_or(false, |h| h.contains_key(&hash))
-            }) {
+            if MINTED_HASHES.with(|hashes| hashes.borrow().contains_key(&hash)) {
                 return Err(format!(
                     "데이터가 이미 민팅되었습니다. (데이터 ID: {})",
                     existing_id
@@ -235,18 +343,13 @@ pub fn store_upload_data(parsed_data: Vec<CborValue>, mime_type: &str) -> Result
         }
 
         // 데이터 ID 생성
-        let data_id = UPLOAD_COUNTER.with(|counter| {
-            let mut counter = counter.borrow_mut();
-            if let Some(ref mut counter) = counter.as_mut() {
-                let current = counter.get();
-                let next_id = current + 1;
-                counter
-                    .set(next_id)
-                    .map_err(|e| format!("카운터 업데이트 실패: {:?}", e))?;
-                Ok(next_id)
-            } else {
-                Err("Upload counter not initialized".to_string())
-            }
+        let data_id = with_upload_counter(|counter| {
+            let current = *counter.get();
+            let next_id = current + 1;
+            counter
+                .set(next_id)
+                .map_err(|e| format!("카운터 업데이트 실패: {:?}", e))?;
+            Ok(next_id)
         })?;
 
         // 데이터 저장
@@ -257,25 +360,13 @@ pub fn store_upload_data(parsed_data: Vec<CborValue>, mime_type: &str) -> Result
         };
 
         UPLOADED_DATA.with(|storage| {
-            let mut storage = storage.borrow_mut();
-            if let Some(ref mut storage) = storage.as_mut() {
-                storage.insert(data_id, data_blob);
-                Ok(())
-            } else {
-                Err("Upload data storage not initialized".to_string())
-            }
-        })?;
+            storage.borrow_mut().insert(data_id, data_blob);
+        });
 
         // 해시 저장
         DATA_HASHES.with(|hashes| {
-            let mut hashes = hashes.borrow_mut();
-            if let Some(ref mut hashes) = hashes.as_mut() {
-                hashes.insert(hash, data_id);
-                Ok(())
-            } else {
-                Err("Data hashes storage not initialized".to_string())
-            }
-        })?;
+            hashes.borrow_mut().insert(hash, data_id);
+        });
 
         data_ids.push(data_id);
     }
@@ -285,28 +376,22 @@ pub fn store_upload_data(parsed_data: Vec<CborValue>, mime_type: &str) -> Result
 
 /// 업로드 데이터 조회
 pub fn get_uploaded_data(data_id: u64) -> Option<Vec<u8>> {
-    UPLOADED_DATA.with(|storage| {
-        let storage = storage.borrow();
-        storage.as_ref()?.get(&data_id).map(|blob| blob.data)
-    })
+    UPLOADED_DATA.with(|storage| storage.borrow().get(&data_id).map(|blob| blob.data))
 }
 
 /// 업로드 데이터 목록 조회
 pub fn list_uploaded_data() -> Vec<DataInfo> {
     UPLOADED_DATA.with(|storage| {
-        let storage = storage.borrow();
-        match storage.as_ref() {
-            Some(storage) => storage
-                .iter()
-                .map(|(id, blob)| DataInfo {
-                    id,
-                    mime_type: blob.mime_type.clone(),
-                    timestamp: blob.timestamp,
-                    size: blob.data.len() as u64,
-                })
-                .collect(),
-            None => Vec::new(),
-        }
+        storage
+            .borrow()
+            .iter()
+            .map(|(id, blob)| DataInfo {
+                id,
+                mime_type: blob.mime_type.clone(),
+                timestamp: blob.timestamp,
+                size: blob.data.len() as u64,
+            })
+            .collect()
     })
 }
 
@@ -314,63 +399,55 @@ pub fn list_uploaded_data() -> Vec<DataInfo> {
 pub fn delete_uploaded_data(data_id: u64) -> Result<String, String> {
     // 먼저 데이터를 가져와서 해시 계산
     let data_hash = UPLOADED_DATA.with(|storage| {
-        let storage = storage.borrow();
         storage
-            .as_ref()
-            .and_then(|s| s.get(&data_id))
+            .borrow()
+            .get(&data_id)
             .map(|blob| calculate_data_hash(&blob.data))
     });
 
     // 민팅된 데이터인지 확인
     if let Some(hash) = &data_hash {
-        if MINTED_HASHES.with(|hashes| {
-            let hashes = hashes.borrow();
-            hashes.as_ref().map_or(false, |h| h.contains_key(hash))
-        }) {
+        if MINTED_HASHES.with(|hashes| hashes.borrow().contains_key(hash)) {
             return Err("민팅된 데이터는 삭제할 수 없습니다".to_string());
         }
     }
 
     // 데이터 삭제
     UPLOADED_DATA.with(|storage| {
-        let mut storage = storage.borrow_mut();
-        match storage.as_mut() {
-            Some(storage) => match storage.remove(&data_id) {
-                Some(_) => {
-                    // 해시 매핑도 삭제
-                    if let Some(hash) = data_hash {
-                        DATA_HASHES.with(|hashes| {
-                            let mut hashes = hashes.borrow_mut();
-                            if let Some(ref mut hashes) = hashes.as_mut() {
-                                hashes.remove(&hash);
-                            }
-                        });
-                    }
-                    Ok(format!("데이터 ID {} 삭제 완료", data_id))
+        match storage.borrow_mut().remove(&data_id) {
+            Some(_) => {
+                // 해시 매핑도 삭제
+                if let Some(hash) = data_hash {
+                    DATA_HASHES.with(|hashes| {
+                        hashes.borrow_mut().remove(&hash);
+                    });
                 }
-                None => Err(format!("데이터 ID {}를 찾을 수 없습니다", data_id)),
-            },
-            None => Err("Storage not initialized".to_string()),
+                Ok(format!("데이터 ID {} 삭제 완료", data_id))
+            }
+            None => Err(format!("데이터 ID {}를 찾을 수 없습니다", data_id)),
         }
     })
 }
 
 // =====================
-// 4) 민팅 요청 관리
+// 5) 민팅 요청 관리
 // =====================
 
 /// 민팅 요청 저장
 pub fn store_mint_request(request: MintRequest) -> u64 {
-    let request_id = MINT_COUNTER.with(|counter| {
-        let mut counter = counter.borrow_mut();
-        if let Some(ref mut counter) = counter.as_mut() {
-            let current = counter.get();
-            let next_id = current + 1;
-            counter.set(next_id).expect("Failed to increment counter");
-            next_id
-        } else {
-            panic!("Mint counter not initialized");
-        }
+    let request_id = with_mint_counter(|counter| {
+        let current = *counter.get();
+        let next_id = current + 1;
+        counter
+            .set(next_id)
+            .map_err(|e| format!("Failed to increment counter: {:?}", e))?;
+        Ok(next_id)
+    })
+    .unwrap_or_else(|e| {
+        ic_cdk::println!("Error accessing mint counter: {}", e);
+        // 긴급 대안: 현재 시간을 기반으로 ID 생성
+        let timestamp = ic_cdk::api::time();
+        (timestamp % 1_000_000) as u64
     });
 
     let request_data = MintRequestData {
@@ -380,18 +457,14 @@ pub fn store_mint_request(request: MintRequest) -> u64 {
 
     // 민팅 요청 저장
     MINT_REQUESTS.with(|requests| {
-        let mut requests = requests.borrow_mut();
-        if let Some(ref mut requests) = requests.as_mut() {
-            requests.insert(request_id, request_data);
-        }
+        requests.borrow_mut().insert(request_id, request_data);
     });
 
     // 초기 상태 설정
     MINT_STATUS_MAP.with(|status_map| {
-        let mut status_map = status_map.borrow_mut();
-        if let Some(ref mut status_map) = status_map.as_mut() {
-            status_map.insert(request_id, MintStatus::Pending);
-        }
+        status_map
+            .borrow_mut()
+            .insert(request_id, MintStatus::Pending);
     });
 
     request_id
@@ -400,9 +473,8 @@ pub fn store_mint_request(request: MintRequest) -> u64 {
 /// 민팅 요청 조회
 pub fn get_mint_request(request_id: u64) -> Option<MintRequest> {
     MINT_REQUESTS.with(|requests| {
-        let requests = requests.borrow();
         requests
-            .as_ref()?
+            .borrow()
             .get(&request_id)
             .map(|data| data.request.clone())
     })
@@ -410,10 +482,7 @@ pub fn get_mint_request(request_id: u64) -> Option<MintRequest> {
 
 /// 민팅 상태 조회
 pub fn get_mint_status(request_id: u64) -> Option<MintStatus> {
-    MINT_STATUS_MAP.with(|status_map| {
-        let status_map = status_map.borrow();
-        status_map.as_ref()?.get(&request_id)
-    })
+    MINT_STATUS_MAP.with(|status_map| status_map.borrow().get(&request_id))
 }
 
 /// 민팅 상태 업데이트 (민팅 완료 시 해시 기록)
@@ -425,24 +494,15 @@ pub fn update_mint_status(request_id: u64, new_status: MintStatus) -> Result<(),
             for metadata in &request.metadata {
                 let hash = calculate_data_hash(metadata);
                 MINTED_HASHES.with(|hashes| {
-                    let mut hashes = hashes.borrow_mut();
-                    if let Some(ref mut hashes) = hashes.as_mut() {
-                        hashes.insert(hash, request_id);
-                    }
+                    hashes.borrow_mut().insert(hash, request_id);
                 });
             }
         }
     }
 
     MINT_STATUS_MAP.with(|status_map| {
-        let mut status_map = status_map.borrow_mut();
-        match status_map.as_mut() {
-            Some(status_map) => {
-                status_map.insert(request_id, new_status);
-                Ok(())
-            }
-            None => Err("Status map not initialized".to_string()),
-        }
+        status_map.borrow_mut().insert(request_id, new_status);
+        Ok(())
     })
 }
 
@@ -450,25 +510,22 @@ pub fn update_mint_status(request_id: u64, new_status: MintStatus) -> Result<(),
 pub fn list_mint_requests() -> Vec<MintRequestInfo> {
     MINT_REQUESTS.with(|requests| {
         MINT_STATUS_MAP.with(|status_map| {
-            let requests = requests.borrow();
-            let status_map = status_map.borrow();
+            let requests_ref = requests.borrow();
+            let status_map_ref = status_map.borrow();
 
-            match (requests.as_ref(), status_map.as_ref()) {
-                (Some(requests), Some(status_map)) => requests
-                    .iter()
-                    .map(|(id, data)| {
-                        let status = status_map.get(&id).unwrap_or(MintStatus::Pending);
-                        MintRequestInfo {
-                            request_id: id,
-                            owner: data.request.owner,
-                            cid: data.request.cid.clone(),
-                            status,
-                            timestamp: data.timestamp,
-                        }
-                    })
-                    .collect(),
-                _ => Vec::new(),
-            }
+            requests_ref
+                .iter()
+                .map(|(id, data)| {
+                    let status = status_map_ref.get(&id).unwrap_or(MintStatus::Pending);
+                    MintRequestInfo {
+                        request_id: id,
+                        owner: data.request.owner,
+                        cid: data.request.cid.clone(),
+                        status,
+                        timestamp: data.timestamp,
+                    }
+                })
+                .collect()
         })
     })
 }
@@ -477,28 +534,23 @@ pub fn list_mint_requests() -> Vec<MintRequestInfo> {
 pub fn get_next_pending_mint() -> Option<(u64, MintRequest)> {
     MINT_REQUESTS.with(|requests| {
         MINT_STATUS_MAP.with(|status_map| {
-            let requests = requests.borrow();
-            let status_map = status_map.borrow();
+            let requests_ref = requests.borrow();
+            let status_map_ref = status_map.borrow();
 
-            match (requests.as_ref(), status_map.as_ref()) {
-                (Some(requests), Some(status_map)) => {
-                    for (request_id, data) in requests.iter() {
-                        if let Some(status) = status_map.get(&request_id) {
-                            if matches!(status, MintStatus::Pending) {
-                                return Some((request_id, data.request.clone()));
-                            }
-                        }
+            for (request_id, data) in requests_ref.iter() {
+                if let Some(status) = status_map_ref.get(&request_id) {
+                    if matches!(status, MintStatus::Pending) {
+                        return Some((request_id, data.request.clone()));
                     }
-                    None
                 }
-                _ => None,
             }
+            None
         })
     })
 }
 
 // =====================
-// 5) 통계 정보
+// 6) 통계 정보
 // =====================
 
 /// 저장소 통계 조회
@@ -510,31 +562,28 @@ pub fn get_storage_stats() -> StorageStats {
         MINT_COUNTER.with(|counter| counter.borrow().as_ref().map_or(0, |c| *c.get()));
 
     let (pending_mints, completed_mints, failed_mints): (u64, u64, u64) =
-        MINT_STATUS_MAP.with(|status_map| match status_map.borrow().as_ref() {
-            Some(status_map) => {
-                let mut pending = 0u64;
-                let mut completed = 0u64;
-                let mut failed = 0u64;
+        MINT_STATUS_MAP.with(|status_map| {
+            let mut pending = 0u64;
+            let mut completed = 0u64;
+            let mut failed = 0u64;
 
-                for (_, status) in status_map.iter() {
-                    match status {
-                        MintStatus::Pending | MintStatus::InProgress => pending += 1,
-                        MintStatus::Completed(_) => completed += 1,
-                        MintStatus::Failed(_) => failed += 1,
-                    }
+            for (_, status) in status_map.borrow().iter() {
+                match status {
+                    MintStatus::Pending | MintStatus::InProgress => pending += 1,
+                    MintStatus::Completed(_) => completed += 1,
+                    MintStatus::Failed(_) => failed += 1,
                 }
-
-                (pending, completed, failed)
             }
-            None => (0u64, 0u64, 0u64),
+
+            (pending, completed, failed)
         });
 
     let storage_size: u64 = UPLOADED_DATA.with(|storage| {
-        storage.borrow().as_ref().map_or(0, |s| {
-            s.iter()
-                .map(|(_, blob)| blob.data.len() as u64)
-                .sum::<u64>()
-        })
+        storage
+            .borrow()
+            .iter()
+            .map(|(_, blob)| blob.data.len() as u64)
+            .sum::<u64>()
     });
 
     StorageStats {
@@ -547,15 +596,16 @@ pub fn get_storage_stats() -> StorageStats {
     }
 }
 
-// storage.rs 파일 끝에 추가할 함수들
+// =====================
+// 7) 추가 헬퍼 함수들
+// =====================
 
 /// 특정 데이터 ID의 정보 조회
 pub fn get_uploaded_data_info(data_id: u64) -> Option<crate::types::DataInfo> {
     UPLOADED_DATA.with(|storage| {
-        let storage = storage.borrow();
         storage
-            .as_ref()
-            .and_then(|s| s.get(&data_id))
+            .borrow()
+            .get(&data_id)
             .map(|blob| crate::types::DataInfo {
                 id: data_id,
                 mime_type: blob.mime_type.clone(),
@@ -575,10 +625,7 @@ pub fn get_multiple_data_info(data_ids: &[u64]) -> Vec<crate::types::DataInfo> {
 
 /// 데이터 ID가 존재하는지 확인
 pub fn data_id_exists(data_id: u64) -> bool {
-    UPLOADED_DATA.with(|storage| {
-        let storage = storage.borrow();
-        storage.as_ref().map_or(false, |s| s.contains_key(&data_id))
-    })
+    UPLOADED_DATA.with(|storage| storage.borrow().contains_key(&data_id))
 }
 
 /// 여러 데이터 ID가 모두 존재하는지 확인

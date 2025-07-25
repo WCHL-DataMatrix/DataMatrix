@@ -111,7 +111,7 @@ pub fn search_listings_service(request: SearchListingsRequest) -> Result<SearchR
     // 요청 검증
     request.validate()?;
 
-    Ok(crate::marketplace_storage::search_listings(&request))
+    Ok(search_listings(&request))
 }
 
 /// 검색어 자동완성
@@ -122,30 +122,28 @@ pub fn get_search_suggestions_service(partial_query: String, limit: Option<usize
         return Vec::new(); // 너무 짧은 검색어는 제안하지 않음
     }
 
-    crate::marketplace_storage::get_search_suggestions(&partial_query, limit)
+    get_search_suggestions(&partial_query, limit)
 }
 
 /// 인기 검색어 조회
 pub fn get_trending_keywords_service(limit: Option<usize>) -> Vec<(String, u32)> {
     let limit = limit.unwrap_or(10).min(50);
-    crate::marketplace_storage::get_trending_keywords(limit)
+    get_trending_keywords(limit)
 }
 
 /// 검색 결과 통계
-pub fn get_search_stats_service(
-    request: SearchListingsRequest,
-) -> Result<crate::marketplace_types::SearchStats, String> {
+pub fn get_search_stats_service(request: SearchListingsRequest) -> Result<SearchStats, String> {
     // 요청 검증
     request.validate()?;
 
     // 검색 실행
-    let search_result = crate::marketplace_storage::search_listings(&request);
+    let search_result = search_listings(&request);
 
-    // 통계 계산 - marketplace_storage의 함수 대신 여기서 직접 계산
+    // 통계 계산
     let listings = &search_result.listings;
 
     if listings.is_empty() {
-        return Ok(crate::marketplace_types::SearchStats {
+        return Ok(SearchStats {
             total_results: 0,
             avg_price: 0,
             price_range: (0, 0),
@@ -182,7 +180,7 @@ pub fn get_search_stats_service(
     top_sellers.sort_by(|a, b| b.1.cmp(&a.1));
     top_sellers.truncate(5);
 
-    Ok(crate::marketplace_types::SearchStats {
+    Ok(SearchStats {
         total_results,
         avg_price,
         price_range: (min_price, max_price),
@@ -193,13 +191,13 @@ pub fn get_search_stats_service(
 
 /// 카테고리별 판매글 수 조회
 pub fn get_categories_service() -> Vec<(String, u64)> {
-    crate::marketplace_storage::get_listings_count_by_category()
+    get_listings_count_by_category()
 }
 
 /// 인기 태그 조회  
 pub fn get_popular_tags_service(limit: Option<u64>) -> Vec<(String, u64)> {
     let limit = limit.unwrap_or(20).min(50);
-    crate::marketplace_storage::get_popular_tags(limit)
+    get_popular_tags(limit)
 }
 
 /// 고급 검색 (여러 조건 조합)
@@ -230,13 +228,13 @@ pub fn advanced_search_service(
 }
 
 /// 검색어 정규화 (공개 함수)
-pub fn normalize_search_query(query: &str) -> String {
-    crate::marketplace_storage::tokenize_query(query).join(" ")
+pub fn normalize_search_query_service(query: String) -> String {
+    tokenize_query(&query).join(" ")
 }
 
 /// 연관 검색어 제안
 pub fn get_related_keywords_service(query: String) -> Vec<String> {
-    let tokens = crate::marketplace_storage::tokenize_query(&query);
+    let tokens = tokenize_query(&query);
     if tokens.is_empty() {
         return Vec::new();
     }
@@ -245,14 +243,11 @@ pub fn get_related_keywords_service(query: String) -> Vec<String> {
     let mut related_keywords = std::collections::HashSet::new();
 
     // 현재 활성 판매글들에서 관련 키워드 추출
-    let active_listings =
-        crate::marketplace_storage::list_listings(Some(ListingStatus::Active), Some(100));
+    let active_listings = list_listings(Some(ListingStatus::Active), Some(100));
 
     for listing in active_listings {
-        let listing_keywords = crate::marketplace_storage::extract_keywords(&format!(
-            "{} {}",
-            listing.title, listing.description
-        ));
+        let listing_keywords =
+            extract_keywords(&format!("{} {}", listing.title, listing.description));
 
         // 검색어 토큰 중 하나라도 매칭되면 해당 판매글의 다른 키워드들을 관련 키워드로 추가
         let has_match = tokens.iter().any(|token| {
@@ -418,9 +413,6 @@ pub fn admin_delete_listing_service(listing_id: u64) -> Result<SuccessResponse, 
         listing.status = ListingStatus::Suspended;
         listing.updated_at = ic_cdk::api::time();
 
-        // 저장 (실제로는 더 정교한 구현 필요)
-        // update_listing_direct(listing)?;
-
         log_activity(
             ActivityType::ListingDeleted,
             user,
@@ -437,235 +429,13 @@ pub fn admin_delete_listing_service(listing_id: u64) -> Result<SuccessResponse, 
 }
 
 // =====================
-// 7) 유틸리티 함수들
-// =====================
-
-/// 판매글 ID 유효성 검사
-pub fn validate_listing_id(listing_id: u64) -> Result<(), String> {
-    if listing_id == 0 {
-        return Err("잘못된 판매글 ID입니다".to_string());
-    }
-
-    if get_listing_readonly(listing_id).is_none() {
-        return Err("판매글을 찾을 수 없습니다".to_string());
-    }
-
-    Ok(())
-}
-
-/// 판매글 접근 권한 확인
-pub fn check_listing_access(listing_id: u64, user: Principal) -> Result<bool, String> {
-    let listing =
-        get_listing_readonly(listing_id).ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())?;
-
-    // 삭제된 판매글은 소유자만 접근 가능
-    if listing.status == ListingStatus::Deleted {
-        return Ok(listing.seller == user);
-    }
-
-    // 일시 중단된 판매글은 소유자와 관리자만 접근 가능
-    if listing.status == ListingStatus::Suspended {
-        return Ok(listing.seller == user || is_admin(user));
-    }
-
-    // 일반 판매글은 모든 사용자 접근 가능
-    Ok(true)
-}
-
-/// 판매글 상태 변경 권한 확인
-pub fn can_change_listing_status(
-    listing_id: u64,
-    user: Principal,
-    new_status: &ListingStatus,
-) -> Result<bool, String> {
-    let listing =
-        get_listing_readonly(listing_id).ok_or_else(|| "판매글을 찾을 수 없습니다".to_string())?;
-
-    // 소유자가 아니고 관리자도 아니면 권한 없음
-    if listing.seller != user && !is_admin(user) {
-        return Ok(false);
-    }
-
-    // 이미 판매된 항목은 상태 변경 불가
-    if listing.status == ListingStatus::Sold && new_status != &ListingStatus::Sold {
-        return Ok(false);
-    }
-
-    // 삭제된 항목은 복구 불가 (관리자 제외)
-    if listing.status == ListingStatus::Deleted && !is_admin(user) {
-        return Ok(false);
-    }
-
-    Ok(true)
-}
-
-/// 가격 형식 검증
-pub fn validate_price(price: u64, currency: &str) -> Result<(), String> {
-    match currency {
-        "ICP" => {
-            if price < 1_000_000 {
-                // 0.01 ICP (e8s 단위)
-                return Err("ICP 가격은 최소 0.01 ICP 이상이어야 합니다".to_string());
-            }
-            if price > 1_000_000_000_000 {
-                // 10,000 ICP
-                return Err("ICP 가격은 최대 10,000 ICP 이하여야 합니다".to_string());
-            }
-        }
-        "USD" => {
-            if price < 100 {
-                // $1.00 (센트 단위)
-                return Err("USD 가격은 최소 $1.00 이상이어야 합니다".to_string());
-            }
-            if price > 100_000_00 {
-                // $100,000.00
-                return Err("USD 가격은 최대 $100,000.00 이하여야 합니다".to_string());
-            }
-        }
-        _ => {
-            return Err("지원되지 않는 통화입니다".to_string());
-        }
-    }
-
-    Ok(())
-}
-
-/// 태그 정규화
-pub fn normalize_tags(tags: Vec<String>) -> Vec<String> {
-    tags.into_iter()
-        .map(|tag| tag.trim().to_lowercase())
-        .filter(|tag| !tag.is_empty() && tag.len() <= 50)
-        .collect::<std::collections::HashSet<_>>() // 중복 제거
-        .into_iter()
-        .take(20) // 최대 20개
-        .collect()
-}
-
-/// 카테고리 정규화
-pub fn normalize_category(category: &str) -> String {
-    category.trim().to_lowercase()
-}
-
-/// 설명 미리보기 생성
-pub fn generate_description_preview(description: &str, max_length: usize) -> String {
-    if description.len() <= max_length {
-        description.to_string()
-    } else {
-        let preview = &description[..max_length.min(description.len())];
-        // 단어 중간에서 자르지 않도록 마지막 공백 찾기
-        if let Some(last_space) = preview.rfind(' ') {
-            format!("{}...", &preview[..last_space])
-        } else {
-            format!("{}...", preview)
-        }
-    }
-}
-
-// =====================
-// 8) 배치 작업 함수들
-// =====================
-
-/// 비활성 판매글 정리 (일정 기간 후 자동 비활성화)
-pub fn cleanup_inactive_listings() -> u64 {
-    let current_time = ic_cdk::api::time();
-    let thirty_days = 30 * 24 * 60 * 60 * 1_000_000_000u64; // 30일 (나노초)
-    let mut cleaned_count = 0u64;
-
-    // 활성 판매글들을 가져와서 확인
-    let active_listings =
-        crate::marketplace_storage::list_listings(Some(ListingStatus::Active), Some(1000));
-
-    for listing_summary in active_listings {
-        if current_time.saturating_sub(listing_summary.updated_at) > thirty_days {
-            // 30일 이상 업데이트되지 않은 판매글을 일시 중단으로 변경
-            let update_request = UpdateListingRequest {
-                listing_id: listing_summary.id,
-                title: None,
-                description: None,
-                price: None,
-                currency: None,
-                category: None,
-                tags: None,
-                preview_data: None,
-                status: Some(ListingStatus::Suspended),
-            };
-
-            // 시스템에서 자동으로 업데이트 (권한 체크 우회)
-            if crate::marketplace_storage::update_listing(update_request, listing_summary.seller)
-                .is_ok()
-            {
-                cleaned_count += 1;
-
-                crate::marketplace_storage::log_activity(
-                    ActivityType::ListingUpdated,
-                    Principal::management_canister(),
-                    Some(listing_summary.id),
-                    "비활성으로 인한 자동 일시 중단".to_string(),
-                );
-            }
-        }
-    }
-
-    cleaned_count
-}
-
-/// 인기 판매글 업데이트 (조회수, 즐겨찾기 수 기반)
-pub fn update_trending_listings() -> Vec<ListingSummary> {
-    let mut trending =
-        crate::marketplace_storage::list_listings(Some(ListingStatus::Active), Some(50));
-
-    // 인기도 계산 (조회수 + 즐겨찾기 수 * 2)
-    trending.sort_by(|a, b| {
-        let score_a = a.view_count + (a.favorite_count * 2);
-        let score_b = b.view_count + (b.favorite_count * 2);
-        score_b.cmp(&score_a)
-    });
-
-    trending.truncate(10);
-    trending
-}
-
-/// 검색 성능 최적화를 위한 인덱스 업데이트
-pub fn update_search_indices() {
-    // TODO: 검색 성능 향상을 위한 인덱스 구조 구현
-    // 현재는 전체 스캔을 사용하지만, 실제 운영에서는 별도 인덱스 테이블 필요
-    ic_cdk::println!("Search indices updated");
-}
-
-// =====================
-// 9) 데이터 내보내기/가져오기
-// =====================
-
-/// 판매글 데이터 내보내기 (백업용)
-pub fn export_listings_data() -> Vec<Listing> {
-    // marketplace_storage의 공개 함수를 통해 데이터 가져오기
-    list_listings(None, None)
-        .into_iter()
-        .filter_map(|summary| get_listing_readonly(summary.id))
-        .collect()
-}
-
-/// 즐겨찾기 데이터 내보내기 (백업용)
-pub fn export_favorites_data() -> Vec<Favorite> {
-    // 구현이 복잡하므로 일단 빈 벡터 반환
-    // 실제로는 marketplace_storage에서 공개 함수 추가 필요
-    Vec::new()
-}
-
-/// 활동 로그 데이터 내보내기 (백업용)
-pub fn export_activity_logs() -> Vec<ActivityLog> {
-    // get_recent_activities를 통해 제한된 데이터만 가져오기
-    crate::marketplace_storage::get_recent_activities(1000)
-}
-
-// =====================
-// 10) 추천 시스템 (기본)
+// 7) 추천 시스템 기능
 // =====================
 
 /// 사용자 맞춤 추천 판매글 (개선된 검색 활용)
-pub fn get_recommended_listings(user: Principal, limit: u64) -> Vec<ListingSummary> {
+pub fn get_recommended_listings_service(user: Principal, limit: u64) -> Vec<ListingSummary> {
     // 간단한 추천 알고리즘: 사용자의 즐겨찾기 기반
-    let user_favorites = crate::marketplace_storage::get_user_favorites(user);
+    let user_favorites = get_user_favorites(user);
 
     if user_favorites.is_empty() {
         // 즐겨찾기가 없으면 인기 판매글 반환
@@ -678,8 +448,8 @@ pub fn get_recommended_listings(user: Principal, limit: u64) -> Vec<ListingSumma
 
     for favorite in &user_favorites {
         // 제목과 설명에서 키워드 추출
-        let title_keywords = crate::marketplace_storage::extract_keywords(&favorite.title);
-        let desc_keywords = crate::marketplace_storage::extract_keywords(&favorite.description);
+        let title_keywords = extract_keywords(&favorite.title);
+        let desc_keywords = extract_keywords(&favorite.description);
 
         all_keywords.extend(title_keywords);
         all_keywords.extend(desc_keywords);
@@ -721,7 +491,7 @@ pub fn get_recommended_listings(user: Principal, limit: u64) -> Vec<ListingSumma
         page_size: Some(limit),
     };
 
-    let search_result = crate::marketplace_storage::search_listings(&search_request);
+    let search_result = search_listings(&search_request);
 
     // 이미 즐겨찾기한 항목들 제외
     search_result
@@ -733,15 +503,15 @@ pub fn get_recommended_listings(user: Principal, limit: u64) -> Vec<ListingSumma
 }
 
 /// 유사한 판매글 찾기 (개선된 검색 활용)
-pub fn get_similar_listings(listing_id: u64, limit: u64) -> Vec<ListingSummary> {
-    let target_listing = match crate::marketplace_storage::get_listing_readonly(listing_id) {
+pub fn get_similar_listings_service(listing_id: u64, limit: u64) -> Vec<ListingSummary> {
+    let target_listing = match get_listing_readonly(listing_id) {
         Some(listing) => listing,
         None => return Vec::new(),
     };
 
     // 대상 판매글의 키워드 추출
-    let title_keywords = crate::marketplace_storage::extract_keywords(&target_listing.title);
-    let desc_keywords = crate::marketplace_storage::extract_keywords(&target_listing.description);
+    let title_keywords = extract_keywords(&target_listing.title);
+    let desc_keywords = extract_keywords(&target_listing.description);
 
     let mut all_keywords: Vec<String> = title_keywords
         .into_iter()
@@ -770,7 +540,7 @@ pub fn get_similar_listings(listing_id: u64, limit: u64) -> Vec<ListingSummary> 
         page_size: Some(limit + 1), // 자기 자신 제외를 위해 +1
     };
 
-    let search_result = crate::marketplace_storage::search_listings(&search_request);
+    let search_result = search_listings(&search_request);
 
     // 자기 자신 제외
     search_result
@@ -781,10 +551,30 @@ pub fn get_similar_listings(listing_id: u64, limit: u64) -> Vec<ListingSummary> 
         .collect()
 }
 
+/// 트렌딩 판매글 업데이트 (조회수, 즐겨찾기 수 기반)
+pub fn get_trending_listings_service() -> Vec<ListingSummary> {
+    update_trending_listings()
+}
+
+/// 인기 판매글 업데이트 (조회수, 즐겨찾기 수 기반)
+pub fn update_trending_listings() -> Vec<ListingSummary> {
+    let mut trending = list_listings(Some(ListingStatus::Active), Some(50));
+
+    // 인기도 계산 (조회수 + 즐겨찾기 수 * 2)
+    trending.sort_by(|a, b| {
+        let score_a = a.view_count + (a.favorite_count * 2);
+        let score_b = b.view_count + (b.favorite_count * 2);
+        score_b.cmp(&score_a)
+    });
+
+    trending.truncate(10);
+    trending
+}
+
 /// 검색 기반 트렌딩 판매글
-pub fn get_trending_by_search() -> Vec<ListingSummary> {
+pub fn get_trending_by_search_service() -> Vec<ListingSummary> {
     // 인기 키워드를 기반으로 트렌딩 판매글 찾기
-    let trending_keywords = crate::marketplace_storage::get_trending_keywords(5);
+    let trending_keywords = get_trending_keywords(5);
 
     if trending_keywords.is_empty() {
         return update_trending_listings();
@@ -809,6 +599,51 @@ pub fn get_trending_by_search() -> Vec<ListingSummary> {
         page_size: Some(10),
     };
 
-    let search_result = crate::marketplace_storage::search_listings(&search_request);
+    let search_result = search_listings(&search_request);
     search_result.listings
+}
+
+// =====================
+// 8) 배치 작업 함수들
+// =====================
+
+/// 비활성 판매글 정리 (일정 기간 후 자동 비활성화)
+pub fn cleanup_inactive_listings_service() -> u64 {
+    let current_time = ic_cdk::api::time();
+    let thirty_days = 30 * 24 * 60 * 60 * 1_000_000_000u64; // 30일 (나노초)
+    let mut cleaned_count = 0u64;
+
+    // 활성 판매글들을 가져와서 확인
+    let active_listings = list_listings(Some(ListingStatus::Active), Some(1000));
+
+    for listing_summary in active_listings {
+        if current_time.saturating_sub(listing_summary.updated_at) > thirty_days {
+            // 30일 이상 업데이트되지 않은 판매글을 일시 중단으로 변경
+            let update_request = UpdateListingRequest {
+                listing_id: listing_summary.id,
+                title: None,
+                description: None,
+                price: None,
+                currency: None,
+                category: None,
+                tags: None,
+                preview_data: None,
+                status: Some(ListingStatus::Suspended),
+            };
+
+            // 시스템에서 자동으로 업데이트 (권한 체크 우회)
+            if update_listing(update_request, listing_summary.seller).is_ok() {
+                cleaned_count += 1;
+
+                log_activity(
+                    ActivityType::ListingUpdated,
+                    Principal::management_canister(),
+                    Some(listing_summary.id),
+                    "비활성으로 인한 자동 일시 중단".to_string(),
+                );
+            }
+        }
+    }
+
+    cleaned_count
 }

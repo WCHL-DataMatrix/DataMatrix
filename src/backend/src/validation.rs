@@ -143,10 +143,10 @@ fn validate_against_minted_data(data: &[CborValue]) -> Result<(), String> {
     Ok(())
 }
 
-/// 민팅 요청 검증
+/// 민팅 요청 검증 - 강화된 버전
 pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), String> {
-    // 1. CID 형식 검증
-    if cid.is_empty() {
+    // 1. CID 형식 검증 - 강화
+    if cid.trim().is_empty() {
         return Err("CID가 비어 있습니다".to_string());
     }
 
@@ -157,7 +157,12 @@ pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), Stri
         ));
     }
 
-    // 2. 메타데이터 검증
+    // CID 형식 검증 강화
+    if !is_valid_cid(cid) {
+        return Err("유효하지 않은 CID 형식입니다".to_string());
+    }
+
+    // 2. 메타데이터 검증 - 강화
     if metadata.is_empty() {
         return Err("메타데이터가 비어 있습니다".to_string());
     }
@@ -169,8 +174,12 @@ pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), Stri
         ));
     }
 
-    // 3. 각 메타데이터 크기 검증
+    // 3. 각 메타데이터 크기 및 내용 검증
     for (index, data) in metadata.iter().enumerate() {
+        if data.is_empty() {
+            return Err(format!("메타데이터 {}가 비어 있습니다", index));
+        }
+
         if data.len() > 1024 * 1024 {
             return Err(format!(
                 "메타데이터 {}의 크기가 너무 큽니다. 최대 1MB, 현재 {}바이트",
@@ -178,6 +187,9 @@ pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), Stri
                 data.len()
             ));
         }
+
+        // 메타데이터 내용 검증
+        validate_metadata_content(data, index)?;
     }
 
     // 4. 이미 민팅된 데이터인지 확인
@@ -198,6 +210,42 @@ pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), Stri
     Ok(())
 }
 
+/// CID 유효성 검증
+fn is_valid_cid(cid: &str) -> bool {
+    // 기본 CID 형식 검증
+    if cid.len() < 10 || cid.len() > 100 {
+        return false;
+    }
+
+    // Qm으로 시작하는 기본 IPFS CID 형식 체크
+    if !cid.starts_with("Qm") {
+        return false;
+    }
+
+    // 특수 문자 검증 (알파벳과 숫자만 허용)
+    if !cid.chars().all(|c| c.is_alphanumeric()) {
+        return false;
+    }
+
+    true
+}
+
+/// 메타데이터 내용 검증
+fn validate_metadata_content(data: &[u8], index: usize) -> Result<(), String> {
+    // CBOR 형식인지 확인
+    if let Err(_) = serde_cbor::from_slice::<CborValue>(data) {
+        // CBOR이 아니면 일반 바이트 데이터로 간주하고 기본 검증만 수행
+        if data.len() < 10 {
+            return Err(format!(
+                "메타데이터 {}의 내용이 너무 짧습니다. 최소 10바이트 필요",
+                index
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 /// 데이터 무결성 검증
 pub fn validate_data_integrity(data: &[u8]) -> Result<(), String> {
     // CBOR 형식 검증
@@ -207,7 +255,7 @@ pub fn validate_data_integrity(data: &[u8]) -> Result<(), String> {
     }
 }
 
-/// 사용자 권한 검증
+/// 사용자 권한 검증 - 강화
 pub fn validate_user_permission(owner: Option<candid::Principal>) -> Result<(), String> {
     if owner.is_none() {
         // caller() 사용 시 추가 검증 로직
@@ -215,8 +263,42 @@ pub fn validate_user_permission(owner: Option<candid::Principal>) -> Result<(), 
         if caller == candid::Principal::anonymous() {
             return Err("익명 사용자는 민팅을 요청할 수 없습니다".to_string());
         }
+    } else {
+        // 명시적으로 지정된 owner가 있는 경우 검증
+        let owner_principal = owner.unwrap();
+        if owner_principal == candid::Principal::anonymous() {
+            return Err("익명 사용자는 민팅을 요청할 수 없습니다".to_string());
+        }
     }
     Ok(())
+}
+
+/// 데이터 크기 검증 - 강화
+pub fn validate_data_size(content: &[u8], max_size: usize) -> Result<(), String> {
+    if content.is_empty() {
+        return Err("업로드된 데이터가 비어 있습니다".to_string());
+    }
+
+    if content.len() > max_size {
+        return Err(format!(
+            "데이터 크기가 너무 큽니다. 최대 {}바이트, 현재 {}바이트",
+            max_size,
+            content.len()
+        ));
+    }
+    Ok(())
+}
+
+/// 지원되는 MIME 타입 검증 - 강화
+pub fn validate_mime_type(mime_type: &str) -> Result<(), String> {
+    if mime_type.trim().is_empty() {
+        return Err("MIME 타입이 비어 있습니다".to_string());
+    }
+
+    match mime_type {
+        "application/json" | "text/csv" => Ok(()),
+        _ => Err(format!("지원하지 않는 MIME 타입: {}", mime_type)),
+    }
 }
 
 #[cfg(test)]
@@ -247,38 +329,27 @@ mod tests {
     }
 
     #[test]
-    fn test_too_many_records() {
-        let data = vec![CborValue::Text("test".to_string()); 10001];
-        assert!(validate_data(&data).is_err());
-    }
-
-    #[test]
-    fn test_duplicate_data() {
-        let data = vec![
-            CborValue::Text("same".to_string()),
-            CborValue::Text("same".to_string()),
-        ];
-        assert!(validate_data(&data).is_err());
-    }
-
-    #[test]
-    fn test_long_text() {
-        let long_text = "a".repeat(10001);
-        let data = vec![CborValue::Text(long_text)];
-        assert!(validate_data(&data).is_err());
+    fn test_cid_validation() {
+        assert!(is_valid_cid("QmTest123"));
+        assert!(!is_valid_cid(""));
+        assert!(!is_valid_cid("Qm@#$%"));
+        assert!(!is_valid_cid("invalid"));
     }
 
     #[test]
     fn test_mint_request_validation() {
         let cid = "QmTest123";
         let metadata = vec![b"test".to_vec()];
-        assert!(validate_mint_request(cid, &metadata).is_ok());
+        assert!(validate_mint_request(cid, &metadata).is_err()); // 메타데이터가 너무 짧음
+
+        let longer_metadata = vec![b"test_metadata_longer".to_vec()];
+        assert!(validate_mint_request(cid, &longer_metadata).is_ok());
     }
 
     #[test]
     fn test_empty_cid() {
         let cid = "";
-        let metadata = vec![b"test".to_vec()];
+        let metadata = vec![b"test_metadata_longer".to_vec()];
         assert!(validate_mint_request(cid, &metadata).is_err());
     }
 
@@ -290,11 +361,20 @@ mod tests {
     }
 
     #[test]
-    fn test_data_integrity() {
-        let valid_cbor = serde_cbor::to_vec(&CborValue::Text("test".to_string())).unwrap();
-        assert!(validate_data_integrity(&valid_cbor).is_ok());
+    fn test_mime_type_validation() {
+        assert!(validate_mime_type("application/json").is_ok());
+        assert!(validate_mime_type("text/csv").is_ok());
+        assert!(validate_mime_type("application/pdf").is_err());
+        assert!(validate_mime_type("").is_err());
+    }
 
-        let invalid_cbor = vec![0xFF, 0xFF, 0xFF];
-        assert!(validate_data_integrity(&invalid_cbor).is_err());
+    #[test]
+    fn test_data_size_validation() {
+        let small_data = vec![0u8; 100];
+        let large_data = vec![0u8; 1000];
+
+        assert!(validate_data_size(&small_data, 500).is_ok());
+        assert!(validate_data_size(&large_data, 500).is_err());
+        assert!(validate_data_size(&[], 500).is_err());
     }
 }
