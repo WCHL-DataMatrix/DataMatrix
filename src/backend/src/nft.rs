@@ -15,36 +15,78 @@ static WORKER_CANISTER: Lazy<Principal> =
 pub fn process_next_mint() {
     // storage에서 다음 대기 중인 민팅 요청 가져오기
     if let Some((request_id, req)) = storage::get_next_pending_mint() {
+        ic_cdk::println!("Processing mint request {}", request_id);
+
         // 상태를 InProgress로 업데이트
         if let Err(e) = storage::update_mint_status(request_id, MintStatus::InProgress) {
-            ic_cdk::println!("Failed to update mint status: {}", e);
+            ic_cdk::println!("Failed to update mint status to InProgress: {}", e);
             return;
         }
 
-        // 비동기로 worker canister 호출
+        // Worker canister 호출
         ic_cdk::spawn(async move {
-            let result: Result<(MintResponse,), _> =
-                call_with_payment(*WORKER_CANISTER, "mint_nft", (req,), 0).await;
+            let worker_canister = Principal::from_text("be2us-64aaa-aaaaa-qaabq-cai")
+                .expect("Invalid worker canister ID");
 
-            // 결과에 따라 상태 업데이트
-            match result {
-                Ok((resp,)) => {
+            // Worker canister의 mint_nft 함수 호출
+            let mint_request = worker::MintRequest {
+                owner: req.owner,
+                cid: req.cid,
+                metadata: req.metadata,
+            };
+
+            match ic_cdk::call::<(worker::MintRequest,), (Result<worker::MintResponse, String>,)>(
+                worker_canister,
+                "mint_nft",
+                (mint_request,),
+            )
+            .await
+            {
+                Ok((Ok(response),)) => {
+                    ic_cdk::println!("Mint successful, token_id: {}", response.token_id);
                     if let Err(e) = storage::update_mint_status(
                         request_id,
-                        MintStatus::Completed(resp.token_id),
+                        MintStatus::Completed(response.token_id),
                     ) {
                         ic_cdk::println!("Failed to update mint status to completed: {}", e);
                     }
                 }
+                Ok((Err(error),)) => {
+                    ic_cdk::println!("Worker returned error: {}", error);
+                    if let Err(e) =
+                        storage::update_mint_status(request_id, MintStatus::Failed(error))
+                    {
+                        ic_cdk::println!("Failed to update mint status to failed: {}", e);
+                    }
+                }
                 Err((code, msg)) => {
-                    if let Err(e) = storage::update_mint_status(
-                        request_id,
-                        MintStatus::Failed(format!("code={:?}, msg={}", code, msg)),
-                    ) {
+                    let error_msg = format!("Worker call failed: code={:?}, msg={}", code, msg);
+                    ic_cdk::println!("{}", error_msg);
+                    if let Err(e) =
+                        storage::update_mint_status(request_id, MintStatus::Failed(error_msg))
+                    {
                         ic_cdk::println!("Failed to update mint status to failed: {}", e);
                     }
                 }
             }
         });
+    } else {
+        ic_cdk::println!("No pending mint requests found");
+    }
+}
+
+mod worker {
+    use candid::{CandidType, Deserialize, Principal};
+
+    #[derive(CandidType, Deserialize)]
+    pub struct MintRequest {
+        pub owner: Option<Principal>,
+        pub cid: String,
+        pub metadata: Vec<Vec<u8>>,
+    }
+
+    #[derive(CandidType, Deserialize)]
+    pub struct MintResponse {
+        pub token_id: u64,
     }
 }

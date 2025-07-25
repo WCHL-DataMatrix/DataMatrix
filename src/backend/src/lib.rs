@@ -169,28 +169,32 @@ fn check_multiple_data_status(data_list: Vec<Vec<u8>>) -> Vec<(Option<u64>, bool
 #[update]
 #[candid_method(update)]
 fn request_mint(request: MintRequest) -> RequestResponse {
-    // 검증 - 실패하면 바로 에러 반환하도록 수정
-    if let Err(e) = validate_mint_request(&request.cid, &request.metadata) {
-        ic_cdk::println!("Mint request validation failed: {}", e);
-        // 검증 실패 시 즉시 에러 상태로 요청 저장
+    // 1. 검증을 먼저 수행하고 실패 시 즉시 에러 상태로 저장
+    let validation_result = validate_mint_request(&request.cid, &request.metadata);
+    let user_validation_result = validate_user_permission(request.owner);
+
+    // 검증 실패 시 즉시 실패 상태로 저장
+    if let Err(validation_error) = validation_result {
+        ic_cdk::println!("Mint request validation failed: {}", validation_error);
         let request_id = storage::store_mint_request(request);
-        let _ = storage::update_mint_status(request_id, MintStatus::Failed(e));
+        let _ = storage::update_mint_status(request_id, MintStatus::Failed(validation_error));
         return RequestResponse { request_id };
     }
 
-    // 사용자 권한 검증
-    if let Err(e) = validate_user_permission(request.owner) {
-        ic_cdk::println!("User permission validation failed: {}", e);
+    if let Err(user_error) = user_validation_result {
+        ic_cdk::println!("User permission validation failed: {}", user_error);
         let request_id = storage::store_mint_request(request);
-        let _ = storage::update_mint_status(request_id, MintStatus::Failed(e));
+        let _ = storage::update_mint_status(request_id, MintStatus::Failed(user_error));
         return RequestResponse { request_id };
     }
 
-    // 검증 통과 시에만 민팅 요청 저장
+    // 2. 검증 통과 시에만 정상 저장
+    ic_cdk::println!("Mint request validation passed, storing request");
     let request_id = storage::store_mint_request(request);
 
-    // 비동기 민팅 처리 시작
+    // 3. 비동기 민팅 처리 시작
     ic_cdk::spawn(async move {
+        ic_cdk::println!("Starting async mint processing for request {}", request_id);
         nft::process_next_mint();
     });
 

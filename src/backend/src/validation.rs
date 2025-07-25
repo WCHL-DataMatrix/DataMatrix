@@ -212,18 +212,23 @@ pub fn validate_mint_request(cid: &str, metadata: &[Vec<u8>]) -> Result<(), Stri
 
 /// CID 유효성 검증
 fn is_valid_cid(cid: &str) -> bool {
-    // 기본 CID 형식 검증
+    // 1. 길이 검증
     if cid.len() < 10 || cid.len() > 100 {
         return false;
     }
 
-    // Qm으로 시작하는 기본 IPFS CID 형식 체크
+    // 2. Qm으로 시작하는지 확인
     if !cid.starts_with("Qm") {
         return false;
     }
 
-    // 특수 문자 검증 (알파벳과 숫자만 허용)
+    // 3. 영숫자만 포함하는지 확인
     if !cid.chars().all(|c| c.is_alphanumeric()) {
+        return false;
+    }
+
+    // 4. 최소 길이 확인 (실제 IPFS CID는 보통 46자 이상)
+    if cid.len() < 46 {
         return false;
     }
 
@@ -232,15 +237,21 @@ fn is_valid_cid(cid: &str) -> bool {
 
 /// 메타데이터 내용 검증
 fn validate_metadata_content(data: &[u8], index: usize) -> Result<(), String> {
-    // CBOR 형식인지 확인
-    if let Err(_) = serde_cbor::from_slice::<CborValue>(data) {
-        // CBOR이 아니면 일반 바이트 데이터로 간주하고 기본 검증만 수행
-        if data.len() < 10 {
-            return Err(format!(
-                "메타데이터 {}의 내용이 너무 짧습니다. 최소 10바이트 필요",
-                index
-            ));
-        }
+    // 최소 10바이트 요구
+    if data.len() < 10 {
+        return Err(format!(
+            "메타데이터 {}의 내용이 너무 짧습니다. 최소 10바이트 필요",
+            index
+        ));
+    }
+
+    // 최대 1MB 제한
+    if data.len() > 1024 * 1024 {
+        return Err(format!(
+            "메타데이터 {}의 크기가 너무 큽니다. 최대 1MB, 현재 {}바이트",
+            index,
+            data.len()
+        ));
     }
 
     Ok(())

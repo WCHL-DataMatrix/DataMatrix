@@ -1,0 +1,268 @@
+=== Complete Minting Integration Test (Backend + Worker) ===
+Starting Complete Integration Test (Backend + Worker)
+====================================================
+Checking and setting up test environment...
+Setting up Backend canister...
+✅ Backend Canister ID: bkyz2-fmaaa-aaaaa-qaaaq-cai
+Setting up Worker canister...
+✅ Worker Canister ID: be2us-64aaa-aaaaa-qaabq-cai
+Verifying Backend-Worker connection...
+Verifying storage initialization...
+Attempting manual storage initialization...
+Current Identity: codespace_dev
+Current Principal: cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae
+Environment setup completed!
+
+--- Preparing Test Data ---
+Test data prepared
+
+==========================================
+MAIN MINTING TESTS (Backend + Worker)
+==========================================
+
+--- Test 1: Valid Complete Mint Flow ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; metadata = vec { vec { 116; 101; 115; 116; 95; 109; 101; 116; 97; 100; 97; 116; 97; 95; 118; 97; 108; 105; 100; 95; 100; 97; 116; 97; 95; 102; 111; 114; 95; 116; 101; 115; 116; 105; 110; 103 } } })'
+✓ Mint request executed
+Response: (record { request_id = 26 : nat64 })
+✓ Request ID: 26
+Checking initial status...
+Initial status: (
+  opt variant {
+    Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]"
+  },
+)
+Waiting for processing...
+Status after 2s: (
+  opt variant {
+    Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]"
+  },
+)
+❌ FAIL: Valid Complete Mint Flow
+Expected: success, Final status: (
+  opt variant {
+    Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]"
+  },
+)
+
+--- Test 2: Second Valid Mint ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "QmSecondValidCID123456789012345678901234567890"; metadata = vec { vec { 115; 101; 99; 111; 110; 100; 95; 118; 97; 108; 105; 100; 95; 109; 101; 116; 97; 100; 97; 116; 97; 95; 116; 101; 115; 116 } } })'
+✓ Mint request executed
+Response: (record { request_id = 27 : nat64 })
+✓ Request ID: 27
+Checking initial status...
+Initial status: (
+  opt variant {
+    Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]"
+  },
+)
+Waiting for processing...
+Status after 2s: (
+  opt variant {
+    Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]"
+  },
+)
+❌ FAIL: Second Valid Mint
+Expected: success, Final status: (
+  opt variant {
+    Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]"
+  },
+)
+
+--- Test 3: Empty CID Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = ""; metadata = vec { vec { 116; 101; 115; 116; 95; 109; 101; 116; 97; 100; 97; 116; 97; 95; 118; 97; 108; 105; 100; 95; 100; 97; 116; 97; 95; 102; 111; 114; 95; 116; 101; 115; 116; 105; 110; 103 } } })'
+✓ Mint request executed
+Response: (record { request_id = 28 : nat64 })
+✓ Request ID: 28
+Checking initial status...
+Initial status: (opt variant { Failed = "CID가 비어 있습니다" })
+Waiting for processing...
+Status after 2s: (opt variant { Failed = "CID가 비어 있습니다" })
+✓ Expected failure: Failed = "CID가 비어 있습니다"
+✅ PASS: Empty CID Test
+
+--- Test 4: Empty Metadata Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; metadata = vec {} })'
+✓ Mint request executed
+Response: (record { request_id = 29 : nat64 })
+✓ Request ID: 29
+Checking initial status...
+Initial status: (opt variant { Failed = "메타데이터가 비어 있습니다" })
+Waiting for processing...
+Status after 2s: (opt variant { Failed = "메타데이터가 비어 있습니다" })
+✓ Expected failure: Failed = "메타데이터가 비어 있습니다"
+✅ PASS: Empty Metadata Test
+
+--- Test 5: Short Metadata Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; metadata = vec { vec { 116; 101; 115; 116 } } })'
+✓ Mint request executed
+Response: (record { request_id = 30 : nat64 })
+✓ Request ID: 30
+Checking initial status...
+Initial status: (
+  opt variant {
+    Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요"
+  },
+)
+Waiting for processing...
+Status after 2s: (
+  opt variant {
+    Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요"
+  },
+)
+✓ Expected failure: Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요"
+✅ PASS: Short Metadata Test
+
+--- Test 6: Invalid CID Format Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "invalid_cid_format"; metadata = vec { vec { 116; 101; 115; 116; 95; 109; 101; 116; 97; 100; 97; 116; 97; 95; 118; 97; 108; 105; 100; 95; 100; 97; 116; 97; 95; 102; 111; 114; 95; 116; 101; 115; 116; 105; 110; 103 } } })'
+✓ Mint request executed
+Response: (record { request_id = 31 : nat64 })
+✓ Request ID: 31
+Checking initial status...
+Initial status: (opt variant { Failed = "유효하지 않은 CID 형식입니다" })
+Waiting for processing...
+Status after 2s: (opt variant { Failed = "유효하지 않은 CID 형식입니다" })
+✓ Expected failure: Failed = "유효하지 않은 CID 형식입니다"
+✅ PASS: Invalid CID Format Test
+
+--- Test 7: Short CID Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "QmShort123"; metadata = vec { vec { 116; 101; 115; 116; 95; 109; 101; 116; 97; 100; 97; 116; 97; 95; 118; 97; 108; 105; 100; 95; 100; 97; 116; 97; 95; 102; 111; 114; 95; 116; 101; 115; 116; 105; 110; 103 } } })'
+✓ Mint request executed
+Response: (record { request_id = 32 : nat64 })
+✓ Request ID: 32
+Checking initial status...
+Initial status: (opt variant { Failed = "유효하지 않은 CID 형식입니다" })
+Waiting for processing...
+Status after 2s: (opt variant { Failed = "유효하지 않은 CID 형식입니다" })
+✓ Expected failure: Failed = "유효하지 않은 CID 형식입니다"
+✅ PASS: Short CID Test
+
+--- Test 8: Long CID Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; metadata = vec { vec { 116; 101; 115; 116; 95; 109; 101; 116; 97; 100; 97; 116; 97; 95; 118; 97; 108; 105; 100; 95; 100; 97; 116; 97; 95; 102; 111; 114; 95; 116; 101; 115; 116; 105; 110; 103 } } })'
+✓ Mint request executed
+Response: (record { request_id = 33 : nat64 })
+✓ Request ID: 33
+Checking initial status...
+Initial status: (opt variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" })
+Waiting for processing...
+Status after 2s: (opt variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" })
+✓ Expected failure: Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자"
+✅ PASS: Long CID Test
+
+--- Test 9: Excessive Metadata Test ---
+Executing: dfx canister call backend request_mint '(record { owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; metadata = vec { vec { 116; 101; 115; 116; 1; 1; 1; 1; 1; 1; 1; 1; 1; 1 }; vec { 116; 101; 115; 116; 2; 2; 2; 2; 2; 2; 2; 2; 2; 2 }; vec { 116; 101; 115; 116; 3; 3; 3; 3; 3; 3; 3; 3; 3; 3 }; vec { 116; 101; 115; 116; 4; 4; 4; 4; 4; 4; 4; 4; 4; 4 }; vec { 116; 101; 115; 116; 5; 5; 5; 5; 5; 5; 5; 5; 5; 5 }; vec { 116; 101; 115; 116; 6; 6; 6; 6; 6; 6; 6; 6; 6; 6 }; vec { 116; 101; 115; 116; 7; 7; 7; 7; 7; 7; 7; 7; 7; 7 }; vec { 116; 101; 115; 116; 8; 8; 8; 8; 8; 8; 8; 8; 8; 8 }; vec { 116; 101; 115; 116; 9; 9; 9; 9; 9; 9; 9; 9; 9; 9 }; vec { 116; 101; 115; 116; 10; 10; 10; 10; 10; 10; 10; 10; 10; 10 }; vec { 116; 101; 115; 116; 11; 11; 11; 11; 11; 11; 11; 11; 11; 11 }; vec { 116; 101; 115; 116; 12; 12; 12; 12; 12; 12; 12; 12; 12; 12 }; vec { 116; 101; 115; 116; 13; 13; 13; 13; 13; 13; 13; 13; 13; 13 }; vec { 116; 101; 115; 116; 14; 14; 14; 14; 14; 14; 14; 14; 14; 14 }; vec { 116; 101; 115; 116; 15; 15; 15; 15; 15; 15; 15; 15; 15; 15 }; vec { 116; 101; 115; 116; 16; 16; 16; 16; 16; 16; 16; 16; 16; 16 }; vec { 116; 101; 115; 116; 17; 17; 17; 17; 17; 17; 17; 17; 17; 17 }; vec { 116; 101; 115; 116; 18; 18; 18; 18; 18; 18; 18; 18; 18; 18 }; vec { 116; 101; 115; 116; 19; 19; 19; 19; 19; 19; 19; 19; 19; 19 }; vec { 116; 101; 115; 116; 20; 20; 20; 20; 20; 20; 20; 20; 20; 20 }; vec { 116; 101; 115; 116; 21; 21; 21; 21; 21; 21; 21; 21; 21; 21 }; vec { 116; 101; 115; 116; 22; 22; 22; 22; 22; 22; 22; 22; 22; 22 }; vec { 116; 101; 115; 116; 23; 23; 23; 23; 23; 23; 23; 23; 23; 23 }; vec { 116; 101; 115; 116; 24; 24; 24; 24; 24; 24; 24; 24; 24; 24 }; vec { 116; 101; 115; 116; 25; 25; 25; 25; 25; 25; 25; 25; 25; 25 }; vec { 116; 101; 115; 116; 26; 26; 26; 26; 26; 26; 26; 26; 26; 26 }; vec { 116; 101; 115; 116; 27; 27; 27; 27; 27; 27; 27; 27; 27; 27 }; vec { 116; 101; 115; 116; 28; 28; 28; 28; 28; 28; 28; 28; 28; 28 }; vec { 116; 101; 115; 116; 29; 29; 29; 29; 29; 29; 29; 29; 29; 29 }; vec { 116; 101; 115; 116; 30; 30; 30; 30; 30; 30; 30; 30; 30; 30 }; vec { 116; 101; 115; 116; 31; 31; 31; 31; 31; 31; 31; 31; 31; 31 }; vec { 116; 101; 115; 116; 32; 32; 32; 32; 32; 32; 32; 32; 32; 32 }; vec { 116; 101; 115; 116; 33; 33; 33; 33; 33; 33; 33; 33; 33; 33 }; vec { 116; 101; 115; 116; 34; 34; 34; 34; 34; 34; 34; 34; 34; 34 }; vec { 116; 101; 115; 116; 35; 35; 35; 35; 35; 35; 35; 35; 35; 35 }; vec { 116; 101; 115; 116; 36; 36; 36; 36; 36; 36; 36; 36; 36; 36 }; vec { 116; 101; 115; 116; 37; 37; 37; 37; 37; 37; 37; 37; 37; 37 }; vec { 116; 101; 115; 116; 38; 38; 38; 38; 38; 38; 38; 38; 38; 38 }; vec { 116; 101; 115; 116; 39; 39; 39; 39; 39; 39; 39; 39; 39; 39 }; vec { 116; 101; 115; 116; 40; 40; 40; 40; 40; 40; 40; 40; 40; 40 }; vec { 116; 101; 115; 116; 41; 41; 41; 41; 41; 41; 41; 41; 41; 41 }; vec { 116; 101; 115; 116; 42; 42; 42; 42; 42; 42; 42; 42; 42; 42 }; vec { 116; 101; 115; 116; 43; 43; 43; 43; 43; 43; 43; 43; 43; 43 }; vec { 116; 101; 115; 116; 44; 44; 44; 44; 44; 44; 44; 44; 44; 44 }; vec { 116; 101; 115; 116; 45; 45; 45; 45; 45; 45; 45; 45; 45; 45 }; vec { 116; 101; 115; 116; 46; 46; 46; 46; 46; 46; 46; 46; 46; 46 }; vec { 116; 101; 115; 116; 47; 47; 47; 47; 47; 47; 47; 47; 47; 47 }; vec { 116; 101; 115; 116; 48; 48; 48; 48; 48; 48; 48; 48; 48; 48 }; vec { 116; 101; 115; 116; 49; 49; 49; 49; 49; 49; 49; 49; 49; 49 }; vec { 116; 101; 115; 116; 50; 50; 50; 50; 50; 50; 50; 50; 50; 50 }; vec { 116; 101; 115; 116; 51; 51; 51; 51; 51; 51; 51; 51; 51; 51 }; vec { 116; 101; 115; 116; 52; 52; 52; 52; 52; 52; 52; 52; 52; 52 }; vec { 116; 101; 115; 116; 53; 53; 53; 53; 53; 53; 53; 53; 53; 53 }; vec { 116; 101; 115; 116; 54; 54; 54; 54; 54; 54; 54; 54; 54; 54 }; vec { 116; 101; 115; 116; 55; 55; 55; 55; 55; 55; 55; 55; 55; 55 }; vec { 116; 101; 115; 116; 56; 56; 56; 56; 56; 56; 56; 56; 56; 56 }; vec { 116; 101; 115; 116; 57; 57; 57; 57; 57; 57; 57; 57; 57; 57 }; vec { 116; 101; 115; 116; 58; 58; 58; 58; 58; 58; 58; 58; 58; 58 }; vec { 116; 101; 115; 116; 59; 59; 59; 59; 59; 59; 59; 59; 59; 59 }; vec { 116; 101; 115; 116; 60; 60; 60; 60; 60; 60; 60; 60; 60; 60 }; vec { 116; 101; 115; 116; 61; 61; 61; 61; 61; 61; 61; 61; 61; 61 }; vec { 116; 101; 115; 116; 62; 62; 62; 62; 62; 62; 62; 62; 62; 62 }; vec { 116; 101; 115; 116; 63; 63; 63; 63; 63; 63; 63; 63; 63; 63 }; vec { 116; 101; 115; 116; 64; 64; 64; 64; 64; 64; 64; 64; 64; 64 }; vec { 116; 101; 115; 116; 65; 65; 65; 65; 65; 65; 65; 65; 65; 65 }; vec { 116; 101; 115; 116; 66; 66; 66; 66; 66; 66; 66; 66; 66; 66 }; vec { 116; 101; 115; 116; 67; 67; 67; 67; 67; 67; 67; 67; 67; 67 }; vec { 116; 101; 115; 116; 68; 68; 68; 68; 68; 68; 68; 68; 68; 68 }; vec { 116; 101; 115; 116; 69; 69; 69; 69; 69; 69; 69; 69; 69; 69 }; vec { 116; 101; 115; 116; 70; 70; 70; 70; 70; 70; 70; 70; 70; 70 }; vec { 116; 101; 115; 116; 71; 71; 71; 71; 71; 71; 71; 71; 71; 71 }; vec { 116; 101; 115; 116; 72; 72; 72; 72; 72; 72; 72; 72; 72; 72 }; vec { 116; 101; 115; 116; 73; 73; 73; 73; 73; 73; 73; 73; 73; 73 }; vec { 116; 101; 115; 116; 74; 74; 74; 74; 74; 74; 74; 74; 74; 74 }; vec { 116; 101; 115; 116; 75; 75; 75; 75; 75; 75; 75; 75; 75; 75 }; vec { 116; 101; 115; 116; 76; 76; 76; 76; 76; 76; 76; 76; 76; 76 }; vec { 116; 101; 115; 116; 77; 77; 77; 77; 77; 77; 77; 77; 77; 77 }; vec { 116; 101; 115; 116; 78; 78; 78; 78; 78; 78; 78; 78; 78; 78 }; vec { 116; 101; 115; 116; 79; 79; 79; 79; 79; 79; 79; 79; 79; 79 }; vec { 116; 101; 115; 116; 80; 80; 80; 80; 80; 80; 80; 80; 80; 80 }; vec { 116; 101; 115; 116; 81; 81; 81; 81; 81; 81; 81; 81; 81; 81 }; vec { 116; 101; 115; 116; 82; 82; 82; 82; 82; 82; 82; 82; 82; 82 }; vec { 116; 101; 115; 116; 83; 83; 83; 83; 83; 83; 83; 83; 83; 83 }; vec { 116; 101; 115; 116; 84; 84; 84; 84; 84; 84; 84; 84; 84; 84 }; vec { 116; 101; 115; 116; 85; 85; 85; 85; 85; 85; 85; 85; 85; 85 }; vec { 116; 101; 115; 116; 86; 86; 86; 86; 86; 86; 86; 86; 86; 86 }; vec { 116; 101; 115; 116; 87; 87; 87; 87; 87; 87; 87; 87; 87; 87 }; vec { 116; 101; 115; 116; 88; 88; 88; 88; 88; 88; 88; 88; 88; 88 }; vec { 116; 101; 115; 116; 89; 89; 89; 89; 89; 89; 89; 89; 89; 89 }; vec { 116; 101; 115; 116; 90; 90; 90; 90; 90; 90; 90; 90; 90; 90 }; vec { 116; 101; 115; 116; 91; 91; 91; 91; 91; 91; 91; 91; 91; 91 }; vec { 116; 101; 115; 116; 92; 92; 92; 92; 92; 92; 92; 92; 92; 92 }; vec { 116; 101; 115; 116; 93; 93; 93; 93; 93; 93; 93; 93; 93; 93 }; vec { 116; 101; 115; 116; 94; 94; 94; 94; 94; 94; 94; 94; 94; 94 }; vec { 116; 101; 115; 116; 95; 95; 95; 95; 95; 95; 95; 95; 95; 95 }; vec { 116; 101; 115; 116; 96; 96; 96; 96; 96; 96; 96; 96; 96; 96 }; vec { 116; 101; 115; 116; 97; 97; 97; 97; 97; 97; 97; 97; 97; 97 }; vec { 116; 101; 115; 116; 98; 98; 98; 98; 98; 98; 98; 98; 98; 98 }; vec { 116; 101; 115; 116; 99; 99; 99; 99; 99; 99; 99; 99; 99; 99 }; vec { 116; 101; 115; 116; 100; 100; 100; 100; 100; 100; 100; 100; 100; 100 }; vec { 116; 101; 115; 116; 101; 101; 101; 101; 101; 101; 101; 101; 101; 101 }; } })'
+✓ Mint request executed
+Response: (record { request_id = 34 : nat64 })
+✓ Request ID: 34
+Checking initial status...
+Initial status: (
+  opt variant {
+    Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개"
+  },
+)
+Waiting for processing...
+Status after 2s: (
+  opt variant {
+    Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개"
+  },
+)
+✓ Expected failure: Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개"
+✅ PASS: Excessive Metadata Test
+
+==========================================
+WORKER INTEGRATION TESTS
+==========================================
+
+--- Test 10: List All Tokens from Worker ---
+✅ PASS: List All Tokens from Worker
+Output: (
+  vec { 1 : nat64; 2 : nat64; 3 : nat64; 4 : nat64; 5 : nat64; 6 : nat64; 7 : nat64; 8 : nat64; 9 : nat64; 10 : nat64; 11 : nat64; 12 : nat64; 13 : nat64; 14 : nat64; 15 : nat64; 16 : nat64; 17 : nat64; 18 : nat64; 19 : nat64; 20 : nat64; 21 : nat64; 22 : nat64; 23 : nat64; 24 : nat64; 25 : nat64; 26 : nat64; 27 : nat64; 28 : nat64;},
+
+--- Test 11: Get Token Info from Worker ---
+✅ PASS: Get Token Info from Worker
+Output: (
+  opt record {
+
+--- Direct Worker Canister Test ---
+✅ PASS: Direct Worker Mint Test
+Direct worker response: (variant { Ok = record { token_id = 29 : nat64 } })
+
+==========================================
+SYSTEM STATE TESTS
+==========================================
+
+--- Test 13: Backend Storage Stats ---
+✅ PASS: Backend Storage Stats
+Output: (
+  record {
+
+--- Test 14: List All Mint Requests ---
+✅ PASS: List All Mint Requests
+Output: (
+  vec { record { cid = "QmValidTest123"; request_id = 1 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_720_520_479_995 : nat64;}; record { cid = ""; request_id = 2 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_721_792_831_584 : nat64;}; record { cid = "QmTestEmpty"; request_id = 3 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_723_061_957_859 : nat64;}; record { cid = "QmTestShort"; request_id = 4 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_724_332_870_823 : nat64;}; record { cid = "invalid_format"; request_id = 5 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_725_607_335_698 : nat64;}; record { cid = "Qm@#$%"; request_id = 6 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_726_878_798_736 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 7 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_728_153_928_477 : nat64;}; record { cid = "QmTestExcess"; request_id = 8 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_729_426_509_591 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 9 : nat64; status = variant { Completed = 25 : nat64 }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_865_462_641_121 : nat64;}; record { cid = ""; request_id = 10 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_868_656_738_872 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 11 : nat64; status = variant { Failed = "메타데이터가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_871_866_919_675 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 12 : nat64; status = variant { Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_875_063_805_707 : nat64;}; record { cid = "invalid_format"; request_id = 13 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_878_264_503_832 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 14 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_881_459_094_783 : nat64;}; record { cid = "Qm@#$%^&*()"; request_id = 15 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_884_698_321_890 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 16 : nat64; status = variant { Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_887_907_520_977 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 17 : nat64; status = variant { Completed = 26 : nat64 }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_053_740_125_282 : nat64;}; record { cid = "QmSecondValidCID123456789012345678901234567890"; request_id = 18 : nat64; status = variant { Completed = 27 : nat64 }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_058_841_459_083 : nat64;}; record { cid = ""; request_id = 19 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_064_576_110_185 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 20 : nat64; status = variant { Failed = "메타데이터가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_069_040_167_806 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 21 : nat64; status = variant { Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_073_499_209_091 : nat64;}; record { cid = "invalid_cid_format"; request_id = 22 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_077_968_543_880 : nat64;}; record { cid = "QmShort123"; request_id = 23 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_082_451_860_274 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 24 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_086_915_124_437 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 25 : nat64; status = variant { Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_091_381_981_854 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 26 : nat64; status = variant { Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_122_260_918_475 : nat64;}; record { cid = "QmSecondValidCID123456789012345678901234567890"; request_id = 27 : nat64; status = variant { Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_126_740_717_698 : nat64;}; record { cid = ""; request_id = 28 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_131_218_533_372 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 29 : nat64; status = variant { Failed = "메타데이터가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_135_686_427_020 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 30 : nat64; status = variant { Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_140_157_663_510 : nat64;}; record { cid = "invalid_cid_format"; request_id = 31 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_144_634_521_321 : nat64;}; record { cid = "QmShort123"; request_id = 32 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_149_114_681_801 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 33 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_153_625_840_637 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 34 : nat64; status = variant { Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_158_097_363_789 : nat64;};},
+
+--- Test 15: Check Data Minted Status ---
+✅ PASS: Check Data Minted Status
+Output: (false)
+
+--- Cross-System Verification ---
+Worker tokens: 29
+Backend completed mints: 3
+✅ PASS: Cross-System Verification
+
+==========================================
+FINAL SYSTEM STATE
+==========================================
+Backend Storage Statistics:
+(
+  record {
+    storage_size = 0 : nat64;
+    completed_mints = 3 : nat64;
+    total_mint_requests = 34 : nat64;
+
+Total Tokens in Worker:
+Count: 29
+
+Recent Mint Requests (last 3):
+(
+  vec { record { cid = "QmValidTest123"; request_id = 1 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_720_520_479_995 : nat64;}; record { cid = ""; request_id = 2 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_721_792_831_584 : nat64;}; record { cid = "QmTestEmpty"; request_id = 3 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_723_061_957_859 : nat64;}; record { cid = "QmTestShort"; request_id = 4 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_724_332_870_823 : nat64;}; record { cid = "invalid_format"; request_id = 5 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_725_607_335_698 : nat64;}; record { cid = "Qm@#$%"; request_id = 6 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_726_878_798_736 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 7 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_728_153_928_477 : nat64;}; record { cid = "QmTestExcess"; request_id = 8 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_729_426_509_591 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 9 : nat64; status = variant { Completed = 25 : nat64 }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_865_462_641_121 : nat64;}; record { cid = ""; request_id = 10 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_868_656_738_872 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 11 : nat64; status = variant { Failed = "메타데이터가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_871_866_919_675 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 12 : nat64; status = variant { Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_875_063_805_707 : nat64;}; record { cid = "invalid_format"; request_id = 13 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_878_264_503_832 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 14 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_881_459_094_783 : nat64;}; record { cid = "Qm@#$%^&*()"; request_id = 15 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_884_698_321_890 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 16 : nat64; status = variant { Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_428_887_907_520_977 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 17 : nat64; status = variant { Completed = 26 : nat64 }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_053_740_125_282 : nat64;}; record { cid = "QmSecondValidCID123456789012345678901234567890"; request_id = 18 : nat64; status = variant { Completed = 27 : nat64 }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_058_841_459_083 : nat64;}; record { cid = ""; request_id = 19 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_064_576_110_185 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 20 : nat64; status = variant { Failed = "메타데이터가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_069_040_167_806 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 21 : nat64; status = variant { Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_073_499_209_091 : nat64;}; record { cid = "invalid_cid_format"; request_id = 22 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_077_968_543_880 : nat64;}; record { cid = "QmShort123"; request_id = 23 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_082_451_860_274 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 24 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_086_915_124_437 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 25 : nat64; status = variant { Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_091_381_981_854 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 26 : nat64; status = variant { Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_122_260_918_475 : nat64;}; record { cid = "QmSecondValidCID123456789012345678901234567890"; request_id = 27 : nat64; status = variant { Failed = "이미 민팅된 메타데이터가 포함되어 있습니다. 인덱스: [0]" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_126_740_717_698 : nat64;}; record { cid = ""; request_id = 28 : nat64; status = variant { Failed = "CID가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_131_218_533_372 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 29 : nat64; status = variant { Failed = "메타데이터가 비어 있습니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_135_686_427_020 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 30 : nat64; status = variant { Failed = "메타데이터 0의 내용이 너무 짧습니다. 최소 10바이트 필요" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_140_157_663_510 : nat64;}; record { cid = "invalid_cid_format"; request_id = 31 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_144_634_521_321 : nat64;}; record { cid = "QmShort123"; request_id = 32 : nat64; status = variant { Failed = "유효하지 않은 CID 형식입니다" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_149_114_681_801 : nat64;}; record { cid = "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; request_id = 33 : nat64; status = variant { Failed = "CID가 너무 깁니다. 최대 100자, 현재 102자" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_153_625_840_637 : nat64;}; record { cid = "QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG"; request_id = 34 : nat64; status = variant { Failed = "메타데이터 개수가 너무 많습니다. 최대 100개, 현재 101개" }; owner = opt principal "cbiuz-j33n3-dnnin-evekz-de36m-pg57b-yke5q-c4lpd-znavy-24ca3-mae"; timestamp = 1_753_429_158_097_363_789 : nat64;};},
+)
+
+Sample Token from Worker:
+(
+  opt record {
+    cid = "QmConcurrent1";
+
+========================================
+COMPLETE INTEGRATION TEST RESULTS
+========================================
+Total Tests: 16
+Passed: 14
+Failed: 2
+
+Success Rate: 87%
+
+Detailed Results:
+  FAIL: Valid Complete Mint Flow
+  FAIL: Second Valid Mint
+  PASS: Empty CID Test
+  PASS: Empty Metadata Test
+  PASS: Short Metadata Test
+  PASS: Invalid CID Format Test
+  PASS: Short CID Test
+  PASS: Long CID Test
+  PASS: Excessive Metadata Test
+  PASS: List All Tokens from Worker
+  PASS: Get Token Info from Worker
+  PASS: Direct Worker Mint Test
+  PASS: Backend Storage Stats
+  PASS: List All Mint Requests
+  PASS: Check Data Minted Status
+  PASS: Cross-System Verification
+
+🎉 COMPLETE INTEGRATION TEST PASSED!
+✅ Backend validation system working correctly
+✅ Worker canister integration successful
+✅ End-to-end minting flow operational
+
+--- Cleanup ---
+Cleanup completed

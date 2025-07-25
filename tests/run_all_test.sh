@@ -252,7 +252,7 @@ main() {
     echo ""
     
     # 테스트 스위트 1: Upload & Validation - 주석 처리 (이미 성공)
-    # run_test_suite "Upload_Validation" "$TEST_DIR/upload_validation_test.sh"
+    run_test_suite "Upload_Validation" "$TEST_DIR/upload_validation_test.sh"
     
     echo ""
     log_info "Upload & Validation test suite skipped (already successful)"
